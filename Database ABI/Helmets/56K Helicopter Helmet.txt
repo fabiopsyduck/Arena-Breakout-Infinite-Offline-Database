@@ -1,0 +1,13 @@
+﻿2.20
+50.0
+4
+Aramid
+/////
+-6%
+-5
+Head, Ears, Face
+Low
+Sim
+Bad
+Bad
+/////
