@@ -24,8 +24,8 @@ $defaultCalibers = @(
 )
 
 $global:ScriptVersion = "0.9"
-$global:GitHubApiUrl = "https://api.github.com/repos/SEU_USUARIO/SEU_REPOSITORIO/releases/latest"
-$global:GitHubReleasePageUrl = "https://github.com/SEU_USUARIO/SEU_REPOSITORIO/releases/latest"
+$global:GitHubApiUrl = "https://api.github.com/repos/fabiopsyduck/Arena-Breakout-Infinite-Offline-Database/releases/latest"
+$global:GitHubReleasePageUrl = "https://github.com/fabiopsyduck/Arena-Breakout-Infinite-Offline-Database/releases/latest"
 
 $weaponClasses = @(
     "ASSAULT RIFLE", "SUBMACHINE GUN", "CARBINE",
