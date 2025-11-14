@@ -1,0 +1,14 @@
+﻿BOLT-ACTION RIFLE
+.338
+11
+15
+32
+90
+10
+125
+1000
+Bolt-Action
+26
+Mid-High
+FB D+
+65

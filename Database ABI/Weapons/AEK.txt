@@ -1,0 +1,14 @@
+﻿ASSAULT RIFLE
+7.62x39mm
+57
+38
+60
+42
+70
+59
+800
+Semi, Full
+800
+Medium
+FB D+
+48

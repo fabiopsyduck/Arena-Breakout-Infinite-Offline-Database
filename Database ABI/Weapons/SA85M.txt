@@ -1,0 +1,14 @@
+﻿CARBINE
+7.62x39mm
+51
+46
+42
+62
+70
+54
+716
+Semi
+300
+Mid-Low
+Default +
+60
