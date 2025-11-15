@@ -23,7 +23,7 @@ $defaultCalibers = @(
     "9x19mm", "9x39mm", "12x70mm", ".44", ".45", ".338"
 )
 
-$global:ScriptVersion = "0.9"
+$global:ScriptVersion = "0.9.1"
 $global:GitHubApiUrl = "https://api.github.com/repos/fabiopsyduck/Arena-Breakout-Infinite-Offline-Database/releases/latest"
 $global:GitHubReleasePageUrl = "https://github.com/fabiopsyduck/Arena-Breakout-Infinite-Offline-Database/releases/latest"
 
@@ -6467,30 +6467,38 @@ function Invoke-UpdateCheck {
 
     $latestVersion = $latestRelease.tag_name.TrimStart('v')
 
-    if ($latestVersion -eq $global:ScriptVersion) {
-        Clear-Host
-        Write-Host "=== Verificar Atualizacoes ==="; Write-Host
-        Write-Host "Verificacao concluida."
-        Write-Host; Write-Host "Voce ja esta com a versao mais recente! (Versao $global:ScriptVersion)"
-        Write-Host; Write-Host "Voltando ao menu em 5 segundos..."
-        Start-Sleep -Seconds 5
-        return
-    }
-
     do {
         Clear-Host
         Write-Host "=== Verificar Atualizacoes ==="; Write-Host
-        Write-Host "ATUALIZACAO ENCONTRADA!" -ForegroundColor Yellow
-        Write-Host; Write-Host "Uma nova versao ($latestVersion) esta disponivel."
-        Write-Host "Sua versao atual e a $global:ScriptVersion."
-        Write-Host; Write-Host "Como este script nao pode se auto-atualizar, siga os passos abaixo:"
-        Write-Host; Write-Host "1. Pressione F2 para abrir a pagina de download no seu navegador."
-        Write-Host "2. Baixe o novo arquivo ""ABIDB.ps1"" da pagina."
-        Write-Host "3. Substitua o seu arquivo ""ABIDB.ps1"" antigo pelo novo."
-        Write-Host "4. Feche e abra o script novamente."
-        Write-Host; Write-Host "Link de Download:"; Write-Host $global:GitHubReleasePageUrl
-        Write-Host; Write-Host "Pressione F1 para voltar ao menu..."
-        Write-Host "Pressione F2 para abrir o link no seu navegador padrao"
+
+        if ($latestVersion -eq $global:ScriptVersion) {
+            Write-Host "Verificacao concluida."
+            Write-Host; Write-Host "Voce ja esta com a versao mais recente do SCRIPT! (Versao $global:ScriptVersion)" -ForegroundColor Green
+            Write-Host; Write-Host "** IMPORTANTE: Esta verificacao e apenas para o SCRIPT (ABIDB.ps1). **"
+            Write-Host "** O seu banco de dados (pasta ""Database ABI"") NAO e verificado. **"
+            Write-Host; Write-Host "Voce pode pressionar F2 para visitar a pagina de releases"
+            Write-Host "e checar o TITULO da versao para ver se ha uma nova"
+            Write-Host "atualizacao do BANCO DE DADOS (ex: ""Database Update - 14/11/2025"")."
+            Write-Host; Write-Host "Link da Pagina:"; Write-Host $global:GitHubReleasePageUrl
+
+        } else {
+            Write-Host "ATUALIZACAO DE SCRIPT ENCONTRADA!" -ForegroundColor Yellow
+            Write-Host; Write-Host "Uma nova versao ($latestVersion) esta disponivel." -ForegroundColor Yellow
+            Write-Host "Sua versao atual e a $global:ScriptVersion."
+            Write-Host; Write-Host "** IMPORTANTE: Esta atualizacao e para o SCRIPT (ABIDB.ps1). **"
+            Write-Host "** O seu banco de dados (pasta ""Database ABI"") NAO sera alterado. **"
+            Write-Host; Write-Host "** DICA: Ao abrir a pagina, LEIA O TITULO da nova release. **"
+            Write-Host "** Ele indicara se uma nova versao do BANCO DE DADOS tambem esta inclusa. **"
+            Write-Host; Write-Host "Passos para atualizar o SCRIPT:"
+            Write-Host; Write-Host "1. Pressione F2 para abrir a pagina de download no seu navegador."
+            Write-Host "2. Baixe o novo arquivo ""ABIDB.ps1"" da pagina."
+            Write-Host "3. Substitua o seu arquivo ""ABIDB.ps1"" antigo pelo novo."
+            Write-Host "4. Feche e abra o script novamente."
+            Write-Host; Write-Host "Link da Pagina:"; Write-Host $global:GitHubReleasePageUrl
+        }
+        
+        Write-Host; Write-Host "Pressione " -NoNewline; Write-Host "F1" -ForegroundColor Red -NoNewline; Write-Host " para voltar ao menu..."
+        Write-Host "Pressione " -NoNewline; Write-Host "F2" -ForegroundColor Blue -NoNewline; Write-Host " para abrir o link no seu navegador padrao"
         
         $key = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown").VirtualKeyCode
         
