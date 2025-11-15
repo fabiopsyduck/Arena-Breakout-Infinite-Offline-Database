@@ -6527,7 +6527,7 @@ function Show-MainMenu {
             "Sair"
         )
         
-        $selectedOption = Show-Menu -Title "Arena Breakout Infinite Offline Database 0.9 (Creator: Fabiopsyduck)" -Options $mainMenuOptions -FlickerFree
+        $selectedOption = Show-Menu -Title "Arena Breakout Infinite Offline Database 0.9.1 (Creator: Fabiopsyduck)" -Options $mainMenuOptions -FlickerFree
         
         switch ($selectedOption) {
             "Consultar Itens (Busca com Filtro)" { Show-ConsultasMenu }
@@ -6548,3 +6548,4 @@ function Show-MainMenu {
 }
 
 Show-MainMenu
+
