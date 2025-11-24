@@ -1,0 +1,14 @@
+﻿ASSAULT RIFLE
+5.56x45mm
+71
+55
+57
+41
+72
+49
+900
+Semi, Full
+750
+Mid-High
+D+ R+
+50

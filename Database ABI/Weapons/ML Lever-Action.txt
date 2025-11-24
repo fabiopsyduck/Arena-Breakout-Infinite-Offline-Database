@@ -1,0 +1,14 @@
+﻿MARKSMAN RIFLE
+.44
+37
+29
+62
+86
+85
+64
+457
+Semi
+75
+Medium
+FB
+65

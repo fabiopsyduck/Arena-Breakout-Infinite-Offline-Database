@@ -1,0 +1,14 @@
+﻿MARKSMAN RIFLE
+9x39mm
+65
+45
+57
+44
+71
+26
+287
+Semi, Full
+850
+Low
+FB
+55
