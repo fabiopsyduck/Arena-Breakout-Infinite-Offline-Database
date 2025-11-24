@@ -1,0 +1,7 @@
+﻿10.0
+80.0
+5
+Aluminum
+-10%
+-7
+Chest, Shoulder, Upper Abdomen
