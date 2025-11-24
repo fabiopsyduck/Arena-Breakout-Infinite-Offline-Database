@@ -6,11 +6,11 @@ Uma ferramenta de console para catalogar e consultar rapidamente qualquer item d
 
 Este script funciona como sua enciclopédia pessoal e 100% offline para o ABI. Você pode adicionar seus próprios itens, editar estatísticas e usar o menu "Busca com Filtro" para encontrar o melhor equipamento (capacetes, coletes, armas) para sua necessidade, com base em critérios de ordenação complexos.
 
-O projeto **já inclui um banco de dados pré-carregado (`Database ABI`)** com dados atualizados (13/11/2025) para você começar a usar imediatamente.
+O projeto **já inclui um banco de dados pré-carregado (`Database ABI`)** com dados atualizados (24/11/2025) para você começar a usar imediatamente.
 
 ## ✨ Recursos Principais
 
-  * **Banco de Dados Incluído:** Comece a usar imediatamente com uma base de dados completa (dados de 13/11/2025).
+  * **Banco de Dados Incluído:** Comece a usar imediatamente com uma base de dados completa (dados de 24/11/2025).
   * **Gerenciamento Completo (CRUD):** Adicione, edite e apague itens em mais de 19 categorias.
   * **Categorias Suportadas:**
       * Armas
