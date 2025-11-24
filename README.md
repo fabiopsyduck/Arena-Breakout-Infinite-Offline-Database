@@ -1,6 +1,6 @@
 # Arena Breakout Infinite - Database Offline (ABIDB)
 
-**Versão 0.9.3 (Criado por: Fabiopsyduck)**
+**Versão 0.9.4 (Criado por: Fabiopsyduck)**
 
 Uma ferramenta de console para catalogar e consultar rapidamente qualquer item do Arena Breakout Infinite.
 
