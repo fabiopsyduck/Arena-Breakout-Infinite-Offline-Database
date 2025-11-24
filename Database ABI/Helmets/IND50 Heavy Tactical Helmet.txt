@@ -1,0 +1,13 @@
+﻿2.30
+60.0
+6
+Composite
+/////
+-1%
+-1
+Head
+Medium
+Nao
+/////
+/////
+Mask, TE
