@@ -23,7 +23,7 @@ $defaultCalibers = @(
     "9x19mm", "9x39mm", "12x70mm", ".44", ".45", ".338"
 )
 
-$global:ScriptVersion = "0.9.2"
+$global:ScriptVersion = "0.9.3"
 $global:GitHubApiUrl = "https://api.github.com/repos/fabiopsyduck/Arena-Breakout-Infinite-Offline-Database/releases/latest"
 $global:GitHubReleasePageUrl = "https://github.com/fabiopsyduck/Arena-Breakout-Infinite-Offline-Database/releases/latest"
 
@@ -4417,13 +4417,17 @@ function List-MaskCompatibility {
     $originalCursorSize = (Get-Host).UI.RawUI.CursorSize; (Get-Host).UI.RawUI.CursorSize = 0
     $compatibilityPath = Join-Path -Path $global:databasePath -ChildPath "Maskcompatibility"
     $masksPath = Join-Path -Path $global:databasePath -ChildPath "Masks"
+    $helmetsPath = Join-Path -Path $global:databasePath -ChildPath "Helmets"
+
     do {
         Clear-Host
         Write-Host "Pressione " -NoNewline; Write-Host "F1" -ForegroundColor Red -NoNewline; Write-Host " para voltar ao menu principal"; Write-Host
+        
         $allCompFiles = Get-ChildItem -Path $compatibilityPath -Filter "*.txt" -File
         if (-not $allCompFiles) {
              Write-Host "`nNenhum registro de compatibilidade encontrado." -ForegroundColor Yellow
         }
+        
         $allCompData = @()
         foreach ($file in $allCompFiles) {
             $content = Get-Content -Path $file.FullName
@@ -4431,6 +4435,7 @@ function List-MaskCompatibility {
                 $maskName = $content[0]
                 $armorClass = "N/A"
                 $armorClassNum = 0
+                
                 $maskDataFile = Join-Path -Path $masksPath -ChildPath "$maskName.txt"
                 if (Test-Path $maskDataFile) {
                     try {
@@ -4441,18 +4446,32 @@ function List-MaskCompatibility {
                                 $armorClassNum = [int]$armorClass
                             }
                         }
-                    } catch {
-                    }
+                    } catch {}
                 }
                 
-                $helmetList = @($content | Select-Object -Skip 1)
+                $rawHelmets = $content | Select-Object -Skip 1
+                $formattedHelmets = @()
+                
+                foreach ($hName in $rawHelmets) {
+                    $hClass = "?"
+                    $hPath = Join-Path -Path $helmetsPath -ChildPath "$hName.txt"
+                    if (Test-Path $hPath) {
+                        try {
+                            $hData = Get-Content -Path $hPath -ErrorAction SilentlyContinue
+                            if ($hData.Count -ge 3) {
+                                $hClass = $hData[2]
+                            }
+                        } catch {}
+                    }
+                    $formattedHelmets += "$hName (Cl. $hClass)"
+                }
                 
                 $allCompData += [PSCustomObject]@{
                     MaskName = $maskName
                     ArmorClass = $armorClass
                     ArmorClassNum = $armorClassNum
-                    Helmets = $helmetList
-                    HelmetCount = $helmetList.Count
+                    Helmets = $formattedHelmets
+                    HelmetCount = $formattedHelmets.Count
                 }
             }
         }
@@ -4463,7 +4482,7 @@ function List-MaskCompatibility {
         while ($i -lt $allCompData.Count) {
             $item1 = $allCompData[$i]
             $item2 = if (($i + 1) -lt $allCompData.Count) { $allCompData[$i + 1] } else { $null }
-            $colWidth = 45
+            $colWidth = 55 
             
             $maskName1 = "$($item1.MaskName):"
             $classDisplay1 = " (Cl. $($item1.ArmorClass))"
@@ -4472,6 +4491,7 @@ function List-MaskCompatibility {
             
             $padding1 = [Math]::Max(0, $colWidth - ($maskName1.Length + $classDisplay1.Length))
             Write-Host (' ' * $padding1) -NoNewline
+            
             if ($item2) {
                 $maskName2 = "$($item2.MaskName):"
                 $classDisplay2 = " (Cl. $($item2.ArmorClass))"
@@ -4479,6 +4499,7 @@ function List-MaskCompatibility {
                 Write-Host $classDisplay2 -ForegroundColor DarkYellow -NoNewline
             }
             Write-Host
+            
             $maxHelmets = [math]::Max($item1.Helmets.Count, $(if ($item2) { $item2.Helmets.Count } else { 0 }))
             for ($j = 0; $j -lt $maxHelmets; $j++) {
                 $helmet1 = if ($j -lt $item1.Helmets.Count) { "  " + $item1.Helmets[$j] } else { "" }
@@ -4491,6 +4512,7 @@ function List-MaskCompatibility {
             Write-Host; Write-Host
             $i += 2
         }
+        
         $key = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown").VirtualKeyCode
     } while ($key -ne 112) 
     (Get-Host).UI.RawUI.CursorSize = $originalCursorSize
@@ -6702,4 +6724,3 @@ function Show-MainMenu {
 }
 
 Show-MainMenu
-
