@@ -2262,230 +2262,342 @@ function Show-ItemFilterScreen {
 }
 
 function Show-AmmoFilterScreen {
+    param(
+        $AmmoData,
+        $CurrentFilters
+    )
     $originalCursorSize = (Get-Host).UI.RawUI.CursorSize; (Get-Host).UI.RawUI.CursorSize = 0
     
-    $allCalibers = Get-ChildItem -Path $AmmoPath -Directory | Select-Object -ExpandProperty Name | Sort-Object
-    $caliberPenetrationRange = @{}
-    foreach ($caliber in $allCalibers) {
-        $ammoFiles = Get-ChildItem -Path (Join-Path $AmmoPath $caliber) -Filter "*.txt" -File
-        if ($ammoFiles) {
-            $levels = $ammoFiles | ForEach-Object { [int](Get-Content $_.FullName -TotalCount 1) } | Sort-Object -Unique
-            if ($levels) {
-                $caliberPenetrationRange[$caliber] = @{ Min = $levels[0]; Max = $levels[-1]; AllLevels = $levels }
-            }
-        }
-    }
+    $levels = $AmmoData | Select-Object -ExpandProperty Lv -Unique | Sort-Object
+    $calibers = $AmmoData | Select-Object -ExpandProperty Calibre -Unique | Sort-Object
+    $chances = @("Baixo", "Medio", "Alto", "//////")
     
-    $tempFilters = $script:advancedFilters.Clone()
-    $selectedLevels = [System.Collections.ArrayList]@($tempFilters.SelectedLevels)
-    $selectedCalibers = [System.Collections.ArrayList]@($tempFilters.SelectedCalibers)
-    $caliberSelectionMethod = $tempFilters.SelectionMethod.Clone()
-    $currentColumn = 0
-    $levelIndex = 0
-    $caliberIndex = 0
-    $penetrationLevels = 0..7
-    $maxRows = [math]::Max($penetrationLevels.Count, $allCalibers.Count)
-    # 1. Desenha a tela estática apenas uma vez
+    $columns = @(
+        @{ Label = "Nivel (Lv)";      Values = $levels;     Width = 20; Prop = "Lv" },
+        @{ Label = "Calibre";         Values = $calibers;   Width = 28; Prop = "Calibre" },
+        @{ Label = "Chance de ferir"; Values = $chances;    Width = 32; Prop = "ChanceFerirDisplay" }
+    )
+    
+    $tempFilters = @{ SelectedValues = $CurrentFilters.SelectedValues.Clone(); SelectionMethod = $CurrentFilters.SelectionMethod.Clone() }
+    
+    $currentColIdx = 0
+    $rowIndices = @(0, 0, 0)
+    
+    $maxRows = 0
+    foreach ($c in $columns) { if ($c.Values.Count -gt $maxRows) { $maxRows = $c.Values.Count } }
+
     Clear-Host
-    Write-Host "=== Filtro de Municoes (Marque o que deseja OCULTAR) ===" -ForegroundColor Yellow; Write-Host
-    Write-Host ("  {0,-36}   {1,-35}" -f "Niveis de Penetracao", "Calibres")
-    Write-Host ("  {0,-36}   {1,-35}" -f ("-"*35), ("-"*35))
-    $startY = [Console]::CursorTop
-    # Helper para desenhar/redesenhar uma única linha da tabela
-    $function:DrawRow = {
-        param($i)
-        
-        [Console]::SetCursorPosition(0, $startY + $i)
-        
-        # Coluna da Esquerda (Níveis)
-        $leftBG = if ($currentColumn -eq 0 -and $i -eq $levelIndex) { 'DarkGray' } else { $Host.UI.RawUI.BackgroundColor }
-        if ($i -lt $penetrationLevels.Count) {
-            $level = $penetrationLevels[$i]
-            $prefix = if ($currentColumn -eq 0 -and $i -eq $levelIndex) { ">" } else { " " }
-            $check = if ($level -in $selectedLevels) { "X" } else { " " }
-            
-            Write-Host "$prefix [" -NoNewline -BackgroundColor $leftBG
-            Write-Host $check -ForegroundColor DarkYellow -NoNewline -BackgroundColor $leftBG
-            Write-Host "] $level" -NoNewline -BackgroundColor $leftBG
-            Write-Host (" " * (33 - $level.ToString().Length)) -NoNewline -BackgroundColor $Host.UI.RawUI.BackgroundColor
-            
-        } else {
-            Write-Host (" " * 39) -NoNewline
-        }
-        # Coluna da Direita (Calibres)
-        $rightBG = if ($currentColumn -eq 1 -and $i -eq $caliberIndex) { 'DarkGray' } else { $Host.UI.RawUI.BackgroundColor }
-        if ($i -lt $allCalibers.Count) {
-            $caliber = $allCalibers[$i]
-            $prefix = if ($currentColumn -eq 1 -and $i -eq $caliberIndex) { ">" } else { " " }
-            $check = if ($caliber -in $selectedCalibers) { "X" } else { " " }
-            Write-Host "$prefix [" -NoNewline -BackgroundColor $rightBG
-            Write-Host $check -ForegroundColor DarkYellow -NoNewline -BackgroundColor $rightBG
-            Write-Host "] $caliber" -NoNewline -BackgroundColor $rightBG
-        }
-        
-        # Preenche o resto da linha para limpar caracteres antigos
-        $padding = [Console]::WindowWidth - [Console]::CursorLeft - 1
-        if ($padding -gt 0) { Write-Host (' ' * $padding) -NoNewline }
-    }
-    # Lógica de seleção automática inicial
-    foreach ($caliber in $allCalibers) {
-        if (-not $caliberPenetrationRange.ContainsKey($caliber)) { continue }
-        $range = $caliberPenetrationRange[$caliber]; $isFullyContained = $true
-        foreach($level in $range.AllLevels){ if($level -notin $selectedLevels){ $isFullyContained = $false; break } }
-        if ($isFullyContained) { if ($caliber -notin $selectedCalibers) { $selectedCalibers.Add($caliber) | Out-Null; $caliberSelectionMethod[$caliber] = "Auto" }
-        } else { if ($caliberSelectionMethod[$caliber] -eq "Auto") { $selectedCalibers.Remove($caliber) | Out-Null; $caliberSelectionMethod.Remove($caliber) } }
-    }
-    # 2. Desenha a tabela e o rodapé pela primeira vez
-    for ($i = 0; $i -lt $maxRows; $i++) { & $function:DrawRow $i }
-    $footerY = $startY + $maxRows
-    [Console]::SetCursorPosition(0, $footerY)
-    Write-Host; Write-Host
-    Write-Host "[Cima/Baixo] Move | [Esq/Dir] Troca Coluna | [Enter] Marca"
-    Write-Host "Aperte " -NoNewline; Write-Host "F1" -ForegroundColor Blue -NoNewline; Write-Host " para salvar a selecao"
-    Write-Host "Aperte " -NoNewline; Write-Host "F2" -ForegroundColor Red -NoNewline; Write-Host " para cancelar ou resetar a selecao e voltar"
+    Write-Host "=== Filtro de Municoes (Marque o que deseja OCULTAR) ===" -ForegroundColor Yellow
+    Write-Host
     
-    do {
-        $oldLevelIndex = $levelIndex
-        $oldCaliberIndex = $caliberIndex
-        $oldColumn = $currentColumn
-        
-        [Console]::SetCursorPosition(0, $footerY + 5) # Posiciona o cursor fora da area visível
-        $key = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown").VirtualKeyCode
-        $redrawOnEnter = $false
-        switch ($key) {
-            38 { # Cima
-                if ($currentColumn -eq 0 -and $levelIndex -gt 0) { $levelIndex-- }
-                if ($currentColumn -eq 1 -and $caliberIndex -gt 0) { $caliberIndex-- }
+    $headerLine = ""
+    $separatorLine = ""
+    foreach ($col in $columns) {
+        $totalHeaderWidth = $col.Width + 2
+        $fmt = "{0,-$totalHeaderWidth}"
+        $headerLine += $fmt -f ("  " + $col.Label)
+        $separatorLine += $fmt -f ("  " + ('-' * ($col.Width - 2)))
+    }
+    Write-Host $headerLine
+    Write-Host $separatorLine
+    
+    $startY = [Console]::CursorTop
+    $footerY = $startY + $maxRows + 1
+    
+    [Console]::SetCursorPosition(0, $footerY)
+    Write-Host; Write-Host "[Cima/Baixo] Move | [Esq/Dir] Troca Coluna | [Enter] Marca/Desmarca"
+    Write-Host "Pressione " -NoNewline; Write-Host "F1" -ForegroundColor Blue -NoNewline; Write-Host " para Salvar e Voltar"
+    Write-Host "Pressione " -NoNewline; Write-Host "F2" -ForegroundColor Red -NoNewline; Write-Host " para Cancelar/Resetar e Voltar"
+
+    $UpdateAutoSelections = {
+        $keysToRemove = [System.Collections.ArrayList]@()
+        foreach ($k in $tempFilters.SelectionMethod.Keys) {
+            if ($tempFilters.SelectionMethod[$k] -eq "Auto") { $keysToRemove.Add($k) }
+        }
+        foreach ($k in $keysToRemove) { 
+            $tempFilters.SelectionMethod.Remove($k)
+            $parts = $k -split '_', 2; $p = $parts[0]; $v = $parts[1]
+            if ($tempFilters.SelectedValues.ContainsKey($p)) { $tempFilters.SelectedValues[$p].Remove($v) }
+        }
+
+        $hiddenItemsMap = @{}
+        foreach ($item in $AmmoData) {
+            $isHidden = $false
+            
+            $key = "Lv_$($item.Lv)"
+            if ($tempFilters.SelectionMethod[$key] -eq "Manual") { $isHidden = $true }
+            
+            if (-not $isHidden) {
+                $key = "Calibre_$($item.Calibre)"
+                if ($tempFilters.SelectionMethod[$key] -eq "Manual") { $isHidden = $true }
             }
-            40 { # Baixo
-                if ($currentColumn -eq 0 -and $levelIndex -lt ($penetrationLevels.Count - 1)) { $levelIndex++ }
-                if ($currentColumn -eq 1 -and $caliberIndex -lt ($allCalibers.Count - 1)) { $caliberIndex++ }
+            
+            if (-not $isHidden) {
+                $key = "ChanceFerirDisplay_$($item.ChanceFerirDisplay)"
+                if ($tempFilters.SelectionMethod[$key] -eq "Manual") { $isHidden = $true }
             }
-            37 { $currentColumn = 0 } # Esquerda
-            39 { $currentColumn = 1 } # Direita
-            13 { # Enter
-                if ($currentColumn -eq 0) {
-                    $levelToToggle = $penetrationLevels[$levelIndex]
-                    if ($selectedLevels.Contains($levelToToggle)) { $selectedLevels.Remove($levelToToggle) } else { $selectedLevels.Add($levelToToggle) | Out-Null }
-                } else {
-                    $caliberToToggle = $allCalibers[$caliberIndex]
-                    if ($caliberSelectionMethod[$caliberToToggle] -ne "Auto") {
-                        if ($selectedCalibers.Contains($caliberToToggle)) {
-                            $selectedCalibers.Remove($caliberToToggle)
-                            $caliberSelectionMethod.Remove($caliberToToggle)
-                        } else {
-                            $selectedCalibers.Add($caliberToToggle) | Out-Null
-                            $caliberSelectionMethod[$caliberToToggle] = "Manual"
-                        }
+            
+            if ($isHidden) { $hiddenItemsMap[$item] = $true }
+        }
+
+        foreach ($col in $columns) {
+            $prop = $col.Prop
+            foreach ($val in $col.Values) {
+                $keyName = "${prop}_${val}"
+                if ($tempFilters.SelectionMethod[$keyName] -eq "Manual") { continue }
+                
+                $itemsInGroup = $AmmoData | Where-Object { $_.$prop -eq $val }
+                
+                if ($itemsInGroup.Count -gt 0) {
+                    $allHidden = $true
+                    foreach ($item in $itemsInGroup) {
+                        if (-not $hiddenItemsMap.ContainsKey($item)) { $allHidden = $false; break }
+                    }
+                    
+                    if ($allHidden) {
+                        $tempFilters.SelectionMethod[$keyName] = "Auto"
+                        if (-not $tempFilters.SelectedValues.ContainsKey($prop)) { $tempFilters.SelectedValues[$prop] = [System.Collections.ArrayList]@() }
+                        if (-not $tempFilters.SelectedValues[$prop].Contains($val)) { $tempFilters.SelectedValues[$prop].Add($val) | Out-Null }
                     }
                 }
-                $redrawOnEnter = $true # Marca para redesenhar tudo (sem piscar)
-            }
-            112 { # F1 - Salvar
-                $script:advancedFilters = @{ SelectedLevels = $selectedLevels; SelectedCalibers = $selectedCalibers; SelectionMethod = $caliberSelectionMethod }
-                (Get-Host).UI.RawUI.CursorSize = $originalCursorSize; return
-            }
-            113 { # F2 - Cancelar ou Resetar
-                $script:advancedFilters = @{ SelectedLevels = [System.Collections.ArrayList]@(); SelectedCalibers = [System.Collections.ArrayList]@(); SelectionMethod = @{} }
-                (Get-Host).UI.RawUI.CursorSize = $originalCursorSize; return
             }
         }
-        # 3. Redesenha apenas o necessário
-        if ($redrawOnEnter) {
-            # Roda a lógica de seleção automática
-            foreach ($caliber in $allCalibers) {
-                if (-not $caliberPenetrationRange.ContainsKey($caliber)) { continue }
-                $range = $caliberPenetrationRange[$caliber]; $isFullyContained = $true
-                foreach($level in $range.AllLevels){ if($level -notin $selectedLevels){ $isFullyContained = $false; break } }
-                if ($isFullyContained) { if ($caliber -notin $selectedCalibers) { $selectedCalibers.Add($caliber) | Out-Null; $caliberSelectionMethod[$caliber] = "Auto" }
-                } else { if ($caliberSelectionMethod[$caliber] -eq "Auto") { $selectedCalibers.Remove($caliber) | Out-Null; $caliberSelectionMethod.Remove($caliber) } }
+    }
+
+    :filterLoop while ($true) {
+        & $UpdateAutoSelections
+
+        for ($i = 0; $i -lt $maxRows; $i++) {
+            [Console]::SetCursorPosition(0, $startY + $i)
+            Write-Host "" -NoNewline
+            for ($c = 0; $c -lt $columns.Count; $c++) {
+                $col = $columns[$c]
+                $width = $col.Width
+                if ($i -lt $col.Values.Count) {
+                    $val = $col.Values[$i]
+                    $propKey = $col.Prop
+                    $keyName = "${propKey}_${val}"
+                    
+                    $isManual = $false; $isAuto = $false
+                    if ($tempFilters.SelectionMethod.ContainsKey($keyName)) {
+                        if ($tempFilters.SelectionMethod[$keyName] -eq "Manual") { $isManual = $true }
+                        elseif ($tempFilters.SelectionMethod[$keyName] -eq "Auto") { $isAuto = $true }
+                    }
+                    $isSelected = $isManual -or $isAuto
+                    
+                    $prefix = if ($c -eq $currentColIdx -and $i -eq $rowIndices[$c]) { ">" } else { " " }
+                    $check = if ($isSelected) { "X" } else { " " }
+                    
+                    $bgColor = if ($prefix -eq ">") { "DarkGray" } else { $Host.UI.RawUI.BackgroundColor }
+                    $fgColor = if ($isManual) { "DarkYellow" } elseif ($isAuto) { "Gray" } else { $Host.UI.RawUI.ForegroundColor }
+                    
+                    Write-Host "$prefix [" -NoNewline -BackgroundColor $bgColor
+                    Write-Host $check -NoNewline -BackgroundColor $bgColor -ForegroundColor $fgColor
+                    Write-Host "] $val" -NoNewline -BackgroundColor $bgColor
+                    
+                    $padding = $width - ($val.ToString().Length + 4)
+                    if ($padding -gt 0) { Write-Host (' ' * $padding) -NoNewline -BackgroundColor $Host.UI.RawUI.BackgroundColor }
+                } else {
+                    Write-Host (' ' * ($width + 2)) -NoNewline
+                }
             }
-            # Redesenha a tabela inteira (sem Clear-Host) para refletir todas as mudanças
-            for ($i = 0; $i -lt $maxRows; $i++) { & $function:DrawRow $i }
-        } else {
-            # Redesenha a linha antiga para remover o destaque
-            if ($oldColumn -eq 0) { & $function:DrawRow $oldLevelIndex } else { & $function:DrawRow $oldCaliberIndex }
-            
-            # Redesenha a nova linha para adicionar o destaque
-            if ($currentColumn -eq 0) { & $function:DrawRow $levelIndex } else { & $function:DrawRow $caliberIndex }
         }
-    } while ($true)
+        
+        [Console]::SetCursorPosition(0, $footerY + 4)
+        
+        $key = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown").VirtualKeyCode
+        switch ($key) {
+            37 { if ($currentColIdx -gt 0) { $currentColIdx-- } }
+            39 { if ($currentColIdx -lt ($columns.Count - 1)) { $currentColIdx++ } }
+            38 { if ($rowIndices[$currentColIdx] -gt 0) { $rowIndices[$currentColIdx]-- } }
+            40 { if ($rowIndices[$currentColIdx] -lt ($columns[$currentColIdx].Values.Count - 1)) { $rowIndices[$currentColIdx]++ } }
+            13 { 
+                $col = $columns[$currentColIdx]
+                $val = $col.Values[$rowIndices[$currentColIdx]]
+                $propKey = $col.Prop
+                $keyName = "${propKey}_${val}"
+                
+                if (-not $tempFilters.SelectedValues.ContainsKey($propKey)) { $tempFilters.SelectedValues[$propKey] = [System.Collections.ArrayList]@() }
+                
+                if ($tempFilters.SelectionMethod[$keyName] -eq "Auto") {
+                }
+                elseif ($tempFilters.SelectionMethod[$keyName] -eq "Manual") {
+                    $tempFilters.SelectedValues[$propKey].Remove($val)
+                    $tempFilters.SelectionMethod.Remove($keyName)
+                }
+                else {
+                    $tempFilters.SelectedValues[$propKey].Add($val) | Out-Null
+                    $tempFilters.SelectionMethod[$keyName] = "Manual"
+                }
+            }
+            112 { 
+                (Get-Host).UI.RawUI.CursorSize = $originalCursorSize
+                return $tempFilters
+            }
+            113 { 
+                (Get-Host).UI.RawUI.CursorSize = $originalCursorSize
+                return @{ SelectedValues = @{}; SelectionMethod = @{} }
+            }
+        }
+    }
 }
 
 function Search-WithFilters {
-    $global:criterioOrdenacao = "Alfabetico"; $global:ordemAtual = "Crescente"
-    $filtroCategoria = "Todas as categorias de armas"
-    $filtroCategoriaDisplay = "Todas as categorias de armas"
-    $filtroCalibre = "Desligado"; $filtroArma = "Desligado"; $armaSelecionada = $null
+    $global:criterioOrdenacao = "Alfabetico"
+    $global:ordemAtual = "Crescente"
+    $filtroArma = "Desligado"
+    $filtroCategoriaDisplay = "Todas"
+    $filtroCategoria = "Todas"
     
-    $script:advancedFilters = @{ SelectedLevels = [System.Collections.ArrayList]@(); SelectedCalibers = [System.Collections.ArrayList]@(); SelectionMethod = @{} }
+    if (-not $script:ammoFilters) { $script:ammoFilters = @{ SelectedValues = @{}; SelectionMethod = @{} } }
+    
+    $caliberToClassesMap = @{}
+    $weaponFiles = Get-ChildItem -Path $weaponsPath -Filter "*.txt" -File
+    foreach ($wf in $weaponFiles) {
+        try {
+            $content = @(Get-Content -Path $wf.FullName -ErrorAction Stop)
+            if ($content.Count -ge 2) {
+                $wClassRaw = $content[0].Trim()
+                $wCaliber = $content[1].Trim()
+                
+                if (-not $caliberToClassesMap.ContainsKey($wCaliber)) { $caliberToClassesMap[$wCaliber] = [System.Collections.ArrayList]@() }
+                if ($wClassRaw -notin $caliberToClassesMap[$wCaliber]) { $caliberToClassesMap[$wCaliber].Add($wClassRaw) | Out-Null }
+            }
+        } catch {}
+    }
+
     $criterios = @("Alfabetico", "Dano Base", "Nivel de penetracao", "Chance de Ferir", "Velocidade inicial", "Precisao", "Penetracao", "Dano de blindagem", "Controle de recuo vertical", "Controle de recuo horizontal")
     
-    $translatedClasses = $weaponClasses | ForEach-Object { $global:WeaponClassToPortugueseMap[$_] } | Sort-Object
-    $categorias = @("Todas as categorias de armas") + $translatedClasses
     $originalCursorSize = (Get-Host).UI.RawUI.CursorSize; (Get-Host).UI.RawUI.CursorSize = 0
     do {
-        $isAdvancedFilterActive = $script:advancedFilters.SelectedLevels.Count -gt 0 -or $script:advancedFilters.SelectedCalibers.Count -gt 0
-        $isToggleAvailable = ($filtroCategoria -eq "Todas as categorias de armas" -and $filtroCalibre -eq "Desligado" -and $filtroArma -eq "Desligado" -and -not $isAdvancedFilterActive)
-        if ($filtroCategoria -eq "Todas as categorias de armas") {
-            $calibresDisponiveis = @("Desligado") + (Get-ChildItem -Path $AmmoPath -Directory | Select-Object -ExpandProperty Name | Sort-Object)
-        } else {
-            $weaponsInCategory = Get-ChildItem -Path $weaponsPath -Filter "*.txt" -File | Where-Object { (Get-Content -Path $_.FullName)[0] -eq $filtroCategoria }
-            $calibresDisponiveis = @("Desligado") + ($weaponsInCategory | ForEach-Object { (Get-Content -Path $_.FullName)[1] } | Select-Object -Unique | Sort-Object)
-        }
-        
         $ammoData = @()
-        if ($filtroArma -ne "Desligado" -and $armaSelecionada) {
-            $weaponFile = Join-Path -Path $weaponsPath -ChildPath "$filtroArma.txt"
-            if (Test-Path $weaponFile) {
-                $content = Get-Content -Path $weaponFile; $filtroCategoria = $content[0]; $calibreArma = $content[1]
-                $filtroCategoriaDisplay = $global:WeaponClassToPortugueseMap[$filtroCategoria]
-                $ammoFiles = Get-ChildItem -Path "$AmmoPath\$calibreArma" -Filter "*.txt" -File -ErrorAction SilentlyContinue
-                foreach ($file in $ammoFiles) { 
-                    if((Get-Content $file.FullName).Count -ge 9) {
-                        $ammoContent = Get-Content -Path $file.FullName
-                        $ammoData += [PSCustomObject]@{ Nome = $file.BaseName; Lv = [int]$ammoContent[0]; Penetracao = $ammoContent[1]; PenetracaoNum = [int]$ammoContent[1]; DanoBase = $ammoContent[2]; DanoBaseNum = if ($ammoContent[2] -match '\((\d+)\)') { [int]$Matches[1] } else { [int]($ammoContent[2] -replace '[^\d]', '') }; DanoArmadura = $ammoContent[3]; DanoArmaduraNum = [double]$ammoContent[3]; Velocidade = [int]$ammoContent[4]; Precisao = $ammoContent[5]; PrecisaoNum = [int]($ammoContent[5] -replace '\+', ''); RecuoVert = $ammoContent[6]; RecuoHoriz = $ammoContent[7]; RecuoVertNum = [int]$ammoContent[6]; RecuoHorizNum = [int]$ammoContent[7]; ChanceFerir = $ammoContent[8]; ChanceFerirNum = switch ($ammoContent[8]) { 'Low' {1}; 'Medium' {2}; 'High' {3}; default {0} }; Calibre = $calibreArma }
-                    }
-                }
-            }
-        } else {
-            if ($filtroCalibre -ne "Desligado") { $calibresFiltrados = @($filtroCalibre) } else { $calibresFiltrados = $calibresDisponiveis | Where-Object { $_ -ne "Desligado" } }
-            foreach ($calibre in $calibresFiltrados) {
-                $ammoFiles = Get-ChildItem -Path "$AmmoPath\$calibre" -Filter "*.txt" -File -ErrorAction SilentlyContinue
-                foreach ($file in $ammoFiles) { 
-                    if((Get-Content $file.FullName).Count -ge 9) {
-                        $content = Get-Content -Path $file.FullName
-                        $ammoData += [PSCustomObject]@{ Nome = $file.BaseName; Lv = [int]$content[0]; Penetracao = $content[1]; PenetracaoNum = [int]$content[1]; DanoBase = $content[2]; DanoBaseNum = if ($content[2] -match '\((\d+)\)') { [int]$Matches[1] } else { [int]($content[2] -replace '[^\d]', '') }; DanoArmadura = $content[3]; DanoArmaduraNum = [double]$content[3]; Velocidade = [int]$content[4]; Precisao = $content[5]; PrecisaoNum = [int]($content[5] -replace '\+', ''); RecuoVert = $content[6]; RecuoHoriz = $content[7]; RecuoVertNum = [int]$content[6]; RecuoHorizNum = [int]$content[7]; ChanceFerir = $content[8]; ChanceFerirNum = switch ($content[8]) { 'Low' {1}; 'Medium' {2}; 'High' {3}; default {0} }; Calibre = $calibre }
-                    }
-                }
-            }
-        }
-        $filteredData = $ammoData
-        if ($isAdvancedFilterActive) {
-            $filteredData = $ammoData | Where-Object { ($_.Lv -notin $script:advancedFilters.SelectedLevels) -and ($_.Calibre -notin $script:advancedFilters.SelectedCalibers) }
-        }
-        $sortedData = Ordenar-Dados -dados $filteredData; Clear-Host; Write-Host "=== Busca de municao com filtro ==="; Write-Host
+        $calibresToScan = [System.Collections.ArrayList]@()
         
-        Write-Host "Botoes: " -NoNewline; Write-Host "F1" -ForegroundColor Cyan -NoNewline; Write-Host " - Mudar Criterio ($global:criterioOrdenacao) | " -NoNewline; Write-Host "F2" -ForegroundColor Yellow -NoNewline; Write-Host " - Mudar Ordem ($global:ordemAtual) | " -NoNewline; Write-Host "F6" -ForegroundColor Gray -NoNewline; Write-Host " - Desligar filtros"
+        if ($filtroArma -ne "Desligado") {
+            $wFile = Join-Path $weaponsPath "$filtroArma.txt"
+            if (Test-Path $wFile) { 
+                $c = @(Get-Content $wFile)
+                if ($c.Count -ge 2) { $calibresToScan.Add($c[1].Trim()) | Out-Null }
+            }
+        }
+        elseif ($filtroCategoria -ne "Todas") {
+            $validCalibers = @(Get-ChildItem -Path $weaponsPath -Filter "*.txt" -File | ForEach-Object {
+                $c = @(Get-Content $_.FullName -TotalCount 2)
+                if ($c.Count -ge 2) {
+                    if ($c[0].Trim() -eq $filtroCategoria) {
+                        $c[1].Trim()
+                    }
+                }
+            } | Select-Object -Unique)
+            
+            if ($validCalibers.Count -gt 0) { $calibresToScan.AddRange($validCalibers) }
+        }
+        else {
+            $calibresToScan.AddRange((Get-ChildItem -Path $AmmoPath -Directory | Select-Object -ExpandProperty Name))
+        }
+
+        foreach ($calibre in $calibresToScan) {
+            $ammoFiles = Get-ChildItem -Path (Join-Path $AmmoPath $calibre) -Filter "*.txt" -File -ErrorAction SilentlyContinue
+            foreach ($file in $ammoFiles) { 
+                $content = @(Get-Content -Path $file.FullName)
+                if ($content.Count -ge 9) {
+                    $chanceRaw = $content[8]
+                    $chanceDisplay = switch ($chanceRaw) { 'Low' {'Baixo'}; 'Medium' {'Medio'}; 'High' {'Alto'}; default {'//////'} }
+                    $chanceNum = switch ($chanceRaw) { 'Low' {1}; 'Medium' {2}; 'High' {3}; default {0} }
+                    
+                    $classesCompativeis = if ($caliberToClassesMap.ContainsKey($calibre)) { 
+                        $caliberToClassesMap[$calibre] | ForEach-Object { $global:WeaponClassToPortugueseMap[$_] }
+                    } else { @("Desconhecida") }
+                    
+                    $ammoData += [PSCustomObject]@{ 
+                        Nome = $file.BaseName
+                        Lv = [int]$content[0]
+                        Penetracao = $content[1]; PenetracaoNum = [int]$content[1]
+                        DanoBase = $content[2]; DanoBaseNum = if ($content[2] -match '\((\d+)\)') { [int]$Matches[1] } else { [int]($content[2] -replace '[^\d]', '') }
+                        DanoArmadura = $content[3]
+                        Velocidade = [int]$content[4]
+                        Precisao = $content[5]
+                        RecuoVert = $content[6]
+                        RecuoHoriz = $content[7]
+                        ChanceFerir = $chanceRaw
+                        ChanceFerirDisplay = $chanceDisplay
+                        ChanceFerirNum = $chanceNum
+                        Calibre = $calibre
+                        ClassesList = $classesCompativeis
+                    }
+                }
+            }
+        }
+
+        $filteredData = $ammoData
+        $isFilterActive = $false
+        
+        if ($filtroArma -eq "Desligado" -and $filtroCategoria -eq "Todas" -and $script:ammoFilters.SelectedValues.Keys.Count -gt 0) {
+            $isFilterActive = $true
+            $sv = $script:ammoFilters.SelectedValues
+            
+            $filteredData = $filteredData | Where-Object {
+                $item = $_
+                $keep = $true
+                
+                if ($sv.ContainsKey("Lv") -and $item.Lv -in $sv["Lv"]) { $keep = $false }
+                if ($keep -and $sv.ContainsKey("Calibre") -and $item.Calibre -in $sv["Calibre"]) { $keep = $false }
+                if ($keep -and $sv.ContainsKey("ChanceFerirDisplay") -and $item.ChanceFerirDisplay -in $sv["ChanceFerirDisplay"]) { $keep = $false }
+                return $keep
+            }
+        }
+
+        $sortedData = Ordenar-Dados -dados $filteredData
+        
+        Clear-Host
+        Write-Host "=== Busca de municao com filtro ==="; Write-Host
+        
+        Write-Host "Botoes: " -NoNewline
+        Write-Host "F1" -ForegroundColor Cyan -NoNewline; Write-Host " - Mudar Criterio ($global:criterioOrdenacao) | " -NoNewline
+        Write-Host "F2" -ForegroundColor Yellow -NoNewline; Write-Host " - Mudar Ordem ($global:ordemAtual)"
+        
         Write-Host "Botoes: " -NoNewline
         
-        $statusF7 = if ($isAdvancedFilterActive) { "(Ligado)" } else { "(Desligado)" }
-        Write-Host "F7" -ForegroundColor $(if ($isAdvancedFilterActive) { 'Magenta' } else { 'DarkGray' }) -NoNewline; Write-Host " - Ocultar municoes $statusF7 | " -NoNewline
-        
-        Write-Host "F8" -ForegroundColor Yellow -NoNewline; Write-Host " - Ver Legenda | " -NoNewline; Write-Host "F9" -ForegroundColor Red -NoNewline; Write-Host " - Voltar ao menu"
-        
-        $displayCategoria = $filtroCategoriaDisplay
-        $displayCalibre = $filtroCalibre
-        $displayArma = $filtroArma
-        $f3Color = 'Green'; $f4Color = 'Blue'; $f5Color = 'Magenta'
-        if ($isAdvancedFilterActive) {
-            $displayCategoria = "Bloqueado"
-            $displayCalibre   = "Bloqueado"
-            $displayArma      = "Bloqueado"
-            $f3Color = 'DarkGray'; $f4Color = 'DarkGray'; $f5Color = 'DarkGray'
+        if ($filtroArma -ne "Desligado" -or $filtroCategoria -ne "Todas") {
+            Write-Host "F3" -ForegroundColor DarkGray -NoNewline; Write-Host " - Ocultar municoes (Bloqueado) | " -NoNewline
+        } else {
+            $statusF3 = if ($isFilterActive) { "(Ligado)" } else { "(Desligado)" }
+            $colorF3 = if ($isFilterActive) { "Magenta" } else { "DarkGray" }
+            Write-Host "F3" -ForegroundColor $colorF3 -NoNewline; Write-Host " - Ocultar municoes $statusF3 | " -NoNewline
         }
-        Write-Host "Filtro: " -NoNewline; Write-Host "F3" -ForegroundColor $f3Color -NoNewline; Write-Host " - Categoria ($displayCategoria) | " -NoNewline; Write-Host "F4" -ForegroundColor $f4Color -NoNewline; Write-Host " - Calibre ($displayCalibre) | " -NoNewline; Write-Host "F5" -ForegroundColor $f5Color -NoNewline; Write-Host " - Arma ($displayArma)"; Write-Host
         
+        $textF4 = if ($filtroCategoria -eq "Todas") { "Categoria (Todas)" } else { "Categoria: ($filtroCategoriaDisplay)" }
+        $colorF4 = if ($filtroCategoria -eq "Todas") { 
+            if ($filtroArma -ne "Desligado") { "DarkGray" } else { "Green" } 
+        } else { "Green" }
+        
+        if ($filtroArma -ne "Desligado" -and $filtroCategoria -eq "Todas") {
+             Write-Host "F4" -ForegroundColor $colorF4 -NoNewline; Write-Host " - Categoria (Bloqueado) | " -NoNewline
+        } else {
+             Write-Host "F4" -ForegroundColor $colorF4 -NoNewline; Write-Host " - $textF4 | " -NoNewline
+        }
+
+        $textF5 = if ($filtroArma -eq "Desligado") { "Arma (Todas)" } else { "Arma: ($filtroArma)" }
+        $colorF5 = if ($filtroArma -eq "Desligado") { "Gray" } else { "Blue" }
+        Write-Host "F5" -ForegroundColor $colorF5 -NoNewline; Write-Host " - $textF5"
+        
+        Write-Host "Botoes: " -NoNewline
+        Write-Host "F6" -ForegroundColor Yellow -NoNewline; Write-Host " - Ver Legenda | " -NoNewline
+        Write-Host "F7" -ForegroundColor Red -NoNewline; Write-Host " - Voltar ao menu" -NoNewline
+        
+        $msgAviso = ""
+        if ($filtroArma -ne "Desligado" -and $filtroCategoria -ne "Todas") { $msgAviso = " | Aviso: (Aperte novamente F4 ou F5 p/ desativar Ambas)" }
+        elseif ($filtroArma -ne "Desligado") { $msgAviso = " | Aviso: (Aperte novamente F5 p/ desativar Arma)" }
+        elseif ($filtroCategoria -ne "Todas") { $msgAviso = " | Aviso: (Aperte novamente F4 p/ desativar Categoria)" }
+        
+        if ($msgAviso) {
+            Write-Host $msgAviso -ForegroundColor Red 
+        } else {
+            Write-Host
+        }
+        
+        Write-Host 
+
         if ($global:criterioOrdenacao -eq "Alfabetico") { Write-Host ("{0,-19}" -f "Nome da Municao") -ForegroundColor Green -NoNewline } else { Write-Host ("{0,-19}" -f "Nome da Municao") -NoNewline }
         Write-Host "   " -NoNewline; if ($global:criterioOrdenacao -eq "Nivel de penetracao") { Write-Host ("{0,-2}" -f "Lv") -ForegroundColor Green -NoNewline } else { Write-Host ("{0,-2}" -f "Lv") -NoNewline }
         Write-Host " " -NoNewline; if ($global:criterioOrdenacao -eq "Penetracao") { Write-Host ("{0,-3}" -f "Pen") -ForegroundColor Green -NoNewline } else { Write-Host ("{0,-3}" -f "Pen") -NoNewline }
@@ -2500,7 +2612,6 @@ function Search-WithFilters {
         Write-Host "-------------------   -- --- -------------- ------------ -------- ---- --- --- ------------  ---------"
         
         foreach ($item in $sortedData) {
-            $chanceFerirDisplay = switch ($item.ChanceFerir) { "Low"{"Baixo"}; "Medium"{"Medio"}; "High"{"Alto"}; default{$item.ChanceFerir} }
             Write-Host ("{0,-19}" -f $item.Nome) -NoNewline -ForegroundColor $(if ($global:criterioOrdenacao -eq "Alfabetico") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
             Write-Host "   " -NoNewline
             Write-Host ("{0,-2}" -f $item.Lv) -NoNewline -ForegroundColor $(if ($global:criterioOrdenacao -eq "Nivel de penetracao") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
@@ -2519,16 +2630,12 @@ function Search-WithFilters {
             Write-Host " " -NoNewline
             Write-Host ("{0,-3}" -f $item.RecuoHoriz) -NoNewline -ForegroundColor $(if ($global:criterioOrdenacao -eq "Controle de recuo horizontal") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
             Write-Host " " -NoNewline
-            Write-Host ("{0,-12}" -f $chanceFerirDisplay) -NoNewline -ForegroundColor $(if ($global:criterioOrdenacao -eq "Chance de Ferir") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
+            Write-Host ("{0,-12}" -f $item.ChanceFerirDisplay) -NoNewline -ForegroundColor $(if ($global:criterioOrdenacao -eq "Chance de Ferir") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
             Write-Host "  " -NoNewline
             Write-Host ("{0,-9}" -f $item.Calibre)
         }
         
-        if ($filtroCalibre -ne "Desligado" -and $filtroArma -eq "Desligado") {
-            $weapons = Get-ChildItem -Path $weaponsPath -Filter "*.txt" -File -ErrorAction SilentlyContinue | Where-Object { (Get-Content -Path $_.FullName)[1] -eq $filtroCalibre } | Group-Object { (Get-Content -Path $_.FullName)[0] }
-            if ($weapons) { Write-Host; Write-Host "=== Armas compativeis ===" -ForegroundColor Cyan; foreach ($group in $weapons) { Write-Host "$($global:WeaponClassToPortugueseMap[$group.Name]):" -ForegroundColor Yellow; Write-Host ($group.Group.BaseName -join ", ") -ForegroundColor Gray } }
-        }
-        if ($global:criterioOrdenacao -ne "Alfabetico" -and $isToggleAvailable -and $sortedData.Count -gt 0) {
+        if ($global:criterioOrdenacao -ne "Alfabetico" -and $filtroArma -eq "Desligado" -and $filtroCategoria -eq "Todas" -and -not $isFilterActive -and $sortedData.Count -gt 0) {
             $ammoList = if ($global:ordemAtual -eq "Crescente") { $sortedData[-1..-$sortedData.Count] } else { $sortedData }
             $topCalibres = @(); $calibresUnicos = @{}
             foreach ($item in $ammoList) { if (-not $calibresUnicos.ContainsKey($item.Calibre)) { $calibresUnicos[$item.Calibre] = $true; $topCalibres += $item; if ($topCalibres.Count -ge 5) { break } } }
@@ -2544,76 +2651,84 @@ function Search-WithFilters {
         $key = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
         switch ($key.VirtualKeyCode) {
             112 { 
-                (Get-Host).UI.RawUI.CursorSize = $originalCursorSize; 
-                $novoCriterio = Show-Menu -Title "Selecione o criterio" -Options $criterios -FlickerFree; 
-                (Get-Host).UI.RawUI.CursorSize = 0; 
-                if ($novoCriterio) { $global:criterioOrdenacao = $novoCriterio } 
+                (Get-Host).UI.RawUI.CursorSize = $originalCursorSize; $novoCriterio = Show-Menu -Title "Selecione o criterio" -Options $criterios -FlickerFree; (Get-Host).UI.RawUI.CursorSize = 0; if ($novoCriterio) { $global:criterioOrdenacao = $novoCriterio } 
             }
-            113 { $global:ordemAtual = if ($global:ordemAtual -eq "Decrescente") { "Crescente" } else { "Decrescente" } }
+            113 { 
+                $global:ordemAtual = if ($global:ordemAtual -eq "Decrescente") { "Crescente" } else { "Decrescente" } 
+            }
             114 { 
-                if (-not $isAdvancedFilterActive) {
-                    (Get-Host).UI.RawUI.CursorSize = $originalCursorSize
-                    $novaCategoriaDisplay = Show-Menu -Title "Selecione a categoria" -Options $categorias -FlickerFree
-                    (Get-Host).UI.RawUI.CursorSize = 0
-                    if ($novaCategoriaDisplay) {
-                        $filtroCategoriaDisplay = $novaCategoriaDisplay
-                        if ($novaCategoriaDisplay -eq "Todas as categorias de armas") {
-                            $filtroCategoria = "Todas as categorias de armas"
-                        } else {
-                            $filtroCategoria = $global:PortugueseToWeaponClassMap[$novaCategoriaDisplay]
-                        }
-                        $filtroCalibre = "Desligado"; $filtroArma = "Desligado" 
-                    }
-                }
+                if ($filtroArma -ne "Desligado" -or $filtroCategoria -ne "Todas") { continue }
+                $updatedFilters = Show-AmmoFilterScreen -AmmoData $ammoData -CurrentFilters $script:ammoFilters
+                if ($updatedFilters) { $script:ammoFilters = $updatedFilters }
             }
             115 { 
-                if (-not $isAdvancedFilterActive) {
-                    (Get-Host).UI.RawUI.CursorSize = $originalCursorSize; 
-                    $novoCalibre = Show-Menu -Title "Selecione o calibre" -Options $calibresDisponiveis -FlickerFree; 
-                    (Get-Host).UI.RawUI.CursorSize = 0; 
-                    if ($novoCalibre) { $filtroCalibre = $novoCalibre; $filtroArma = "Desligado" }
+                if ($filtroArma -ne "Desligado" -and $filtroCategoria -eq "Todas") { continue }
+                
+                if ($filtroCategoria -ne "Todas") {
+                    $filtroCategoria = "Todas"
+                    $filtroCategoriaDisplay = "Todas"
+                    $filtroArma = "Desligado"
+                    $script:ammoFilters = @{ SelectedValues = @{}; SelectionMethod = @{} }
+                } else {
+                    (Get-Host).UI.RawUI.CursorSize = $originalCursorSize
+                    $translatedClasses = $weaponClasses | ForEach-Object { $global:WeaponClassToPortugueseMap[$_] } | Sort-Object
+                    $categoriaDisplay = Show-Menu -Title "Selecione a categoria da arma" -Options $translatedClasses -FlickerFree -EnableF1BackButton
+                    if ($categoriaDisplay -and $categoriaDisplay -ne $global:ACTION_BACK) {
+                        $filtroCategoriaDisplay = $categoriaDisplay
+                        $filtroCategoria = $global:PortugueseToWeaponClassMap[$categoriaDisplay]
+                        $script:ammoFilters = @{ SelectedValues = @{}; SelectionMethod = @{} }
+                    }
+                    (Get-Host).UI.RawUI.CursorSize = 0
                 }
             }
             116 { 
-                if (-not $isAdvancedFilterActive) {
-                    (Get-Host).UI.RawUI.CursorSize = $originalCursorSize; 
-                    if ($filtroArma -eq "Desligado") { 
-                        $categoriaDisplay = Show-Menu -Title "Selecione a categoria" -Options $translatedClasses -FlickerFree; 
-                        if ($categoriaDisplay) { 
-                            $categoria = $global:PortugueseToWeaponClassMap[$categoriaDisplay]; 
-                            $armas = Get-ChildItem -Path $weaponsPath -Filter "*.txt" -File | Where-Object { (Get-Content -Path $_.FullName)[0] -eq $categoria } | Select-Object -ExpandProperty BaseName | Sort-Object; 
-                            $arma = Show-Menu -Title "Selecione a arma" -Options $armas -FlickerFree; 
-                            if ($arma) { $filtroArma = $arma; $armaSelecionada = $true } 
-                        } 
-                    } else { 
-                        $filtroArma = "Desligado"; $armaSelecionada = $null; $filtroCategoria = "Todas as categorias de armas"; $filtroCategoriaDisplay = "Todas as categorias de armas" 
-                    }; 
+                if ($filtroArma -ne "Desligado") {
+                    $filtroArma = "Desligado"
+                    $filtroCategoria = "Todas"
+                    $filtroCategoriaDisplay = "Todas"
+                    $script:ammoFilters = @{ SelectedValues = @{}; SelectionMethod = @{} }
+                } else {
+                    (Get-Host).UI.RawUI.CursorSize = $originalCursorSize
+                    
+                    $categoriaParaFiltrar = $null
+                    if ($filtroCategoria -ne "Todas") {
+                        $categoriaParaFiltrar = $filtroCategoria
+                    } else {
+                        $translatedClasses = $weaponClasses | ForEach-Object { $global:WeaponClassToPortugueseMap[$_] } | Sort-Object
+                        $catDisplay = Show-Menu -Title "Selecione a categoria para ver as armas" -Options $translatedClasses -FlickerFree -EnableF1BackButton
+                        
+                        if ($catDisplay -and $catDisplay -ne $global:ACTION_BACK) {
+                            $categoriaParaFiltrar = $global:PortugueseToWeaponClassMap[$catDisplay]
+                        }
+                    }
+
+                    if ($categoriaParaFiltrar) {
+                        $armas = Get-ChildItem -Path $weaponsPath -Filter "*.txt" -File | Where-Object { 
+                            $c = @(Get-Content $_.FullName -TotalCount 1)
+                            if ($c.Count -ge 1) { $c[0].Trim() -eq $categoriaParaFiltrar }
+                        } | Select-Object -ExpandProperty BaseName | Sort-Object
+                        
+                        if ($armas.Count -gt 0) {
+                            $novaArma = Show-Menu -Title "Selecione a arma" -Options $armas -FlickerFree -EnableF1BackButton
+                            if ($novaArma -and $novaArma -ne $global:ACTION_BACK) {
+                                $filtroArma = $novaArma
+                                $script:ammoFilters = @{ SelectedValues = @{}; SelectionMethod = @{} }
+                            }
+                        } else {
+                            Write-Host "Nenhuma arma encontrada nesta categoria." -ForegroundColor Yellow; Start-Sleep -Seconds 2
+                        }
+                    }
                     (Get-Host).UI.RawUI.CursorSize = 0
                 }
             }
-            117 { # F6 - Desligar filtros
-                $filtroCategoria = "Todas as categorias de armas"; $filtroCategoriaDisplay = "Todas as categorias de armas"; $filtroCalibre = "Desligado"; $filtroArma = "Desligado"; $armaSelecionada = $null
-                $script:advancedFilters = @{ SelectedLevels = [System.Collections.ArrayList]@(); SelectedCalibers = [System.Collections.ArrayList]@(); SelectionMethod = @{} }
-            }
-            118 { # F7 - Filtro avançado
-                Show-AmmoFilterScreen
-                (Get-Host).UI.RawUI.CursorSize = 0
-                
-                if ($script:advancedFilters.SelectedLevels.Count -gt 0 -or $script:advancedFilters.SelectedCalibers.Count -gt 0) {
-                    $filtroCategoria = "Todas as categorias de armas"
-                    $filtroCategoriaDisplay = "Todas as categorias de armas"
-                    $filtroCalibre = "Desligado"
-                    $filtroArma = "Desligado"
-                    $armaSelecionada = $null
-                }
-                continue 
-            }
-            119 { Show-AmmoLegend; continue } # F8
-            120 { 
-                $script:advancedFilters = @{ SelectedLevels = [System.Collections.ArrayList]@(); SelectedCalibers = [System.Collections.ArrayList]@(); SelectionMethod = @{} }
+            117 { 
+                Show-AmmoLegend; continue 
+            } 
+            118 { 
+                $script:ammoFilters = @{ SelectedValues = @{}; SelectionMethod = @{} }
                 (Get-Host).UI.RawUI.CursorSize = $originalCursorSize
                 return 
-            } # F9
+            }
         }
     } while ($true)
 }
@@ -2623,61 +2738,91 @@ function Search-WeaponsWithFilters {
     (Get-Host).UI.RawUI.CursorSize = 0
     $criterioOrdenacao = "Alfabetico"
     $ordemAtual = "Crescente"
-    $filtroCategoria = "Todas as armas"
-    $filtroCategoriaDisplay = "Todas as armas"
-    $filtroCalibre = "Todos os calibres"
+    
+    # Inicializa o estado do filtro se não existir
+    if (-not $script:weaponFilters) {
+        $script:weaponFilters = @{ SelectedValues = @{}; SelectionMethod = @{} }
+    }
+
     $criterios = @("Alfabetico", "Calibre", "Controle de recuo vertical", "Controle de recuo horizontal", "Ergonomia", "Estabilidade de arma", "Precisao", "Estabilidade sem mirar", "Distancia Efetiva", "Velocidade de Saida", "Modo de disparo", "Cadencia", "Poder de fogo", "Melhoria de cano")
     
-    $translatedClasses = $weaponClasses | ForEach-Object { $global:WeaponClassToPortugueseMap[$_] } | Sort-Object
-    $categorias = @("Todas as armas") + $translatedClasses
+    # Mapas de tradução para o filtro ficar bonito
+    $poderFogoMapDisplay = @{ "Low"="Baixo";"Mid-Low"="Medio-Baixo";"Medium"="Medio";"Mid-High"="Medio-Alto";"High"="Alto" }
+    $canoMapDisplay = @{ "Default +"="Padrao +";"FB"="CF";"R+"="A+";"FB D+"="CF D+";"FB D-"="CF D-";"D+ R+"="D+ A+";"Custom"="Custom" }
+
     do {
-        $filesFiltradosPorCategoria = Get-ChildItem -Path $weaponsPath -Filter "*.txt" -File
-        if ($filtroCategoria -ne "Todas as armas") {
-            $filesFiltradosPorCategoria = $filesFiltradosPorCategoria | Where-Object { (Get-Content $_.FullName -TotalCount 1) -eq $filtroCategoria }
-        }
-        $calibresDisponiveis = $filesFiltradosPorCategoria | ForEach-Object { (Get-Content $_.FullName)[1] } | Select-Object -Unique | Sort-Object
         $weaponData = @()
-        $weaponDataFiles = $filesFiltradosPorCategoria
-        if ($filtroCalibre -ne "Todos os calibres") {
-            $weaponDataFiles = $weaponDataFiles | Where-Object { (Get-Content $_.FullName)[1] -eq $filtroCalibre }
-        }
+        # Pega todas as armas
+        $weaponDataFiles = Get-ChildItem -Path $weaponsPath -Filter "*.txt" -File
+        
         foreach ($file in $weaponDataFiles) {
             $content = Get-Content -Path $file.FullName
-            # Garante que o arquivo tenha no mínimo as 13 linhas originais.
             if ($content.Count -ge 13) {
-                $estabilidadeArmaValue = 0 # Valor padrão para armas antigas
-                # Verifica se o arquivo tem a 14ª linha (a nova)
-                if ($content.Count -ge 14) {
-                    $estabilidadeArmaValue = [int]$content[13] # A nova estabilidade está no índice 13
-                }
+                $estabilidadeArmaValue = 0
+                if ($content.Count -ge 14) { $estabilidadeArmaValue = [int]$content[13] }
+                
+                # Prepara valores de exibição para o filtro
+                $classePT = $global:WeaponClassToPortugueseMap[$content[0]]
+                $modoDisparoDisplay = $content[9].Replace('Bolt-Action', 'A.Ferrolho').Replace('Pump-Action', 'A.Bombeamento').Replace('Full', 'Auto')
+                $poderDisplay = if ($poderFogoMapDisplay.ContainsKey($content[11])) { $poderFogoMapDisplay[$content[11]] } else { $content[11] }
+                $canoDisplay = if ($canoMapDisplay.ContainsKey($content[12])) { $canoMapDisplay[$content[12]] } else { $content[12] }
+
                 $weaponData += [PSCustomObject]@{
                     Nome             = $file.BaseName
                     Classe           = $content[0]
+                    ClasseDisplay    = $classePT # Propriedade para o Filtro
                     Calibre          = $content[1]
                     VerticalRecoil   = [int]$content[2]
                     HorizontalRecoil = [int]$content[3]
                     Ergonomia        = [int]$content[4]
-                    EstabilidadeArma = $estabilidadeArmaValue # A nova propriedade
+                    EstabilidadeArma = $estabilidadeArmaValue
                     Precisao         = [int]$content[5]
-                    Estabilidade     = [int]$content[6] # Estabilidade SEM mirar
+                    Estabilidade     = [int]$content[6]
                     Alcance          = [int]$content[7]
                     Velocidade       = [int]$content[8]
                     ModoDisparo      = $content[9]
+                    ModoDisparoDisplay = $modoDisparoDisplay # Propriedade para o Filtro
                     Cadencia         = [int]$content[10]
                     PoderFogo        = $content[11]
-                    Cano             = $content[12] # O Cano está no índice 12
+                    PoderFogoDisplay = $poderDisplay # Propriedade para o Filtro
+                    Cano             = $content[12]
+                    CanoDisplay      = $canoDisplay # Propriedade para o Filtro
                 }
             }
         }
         
-        $weaponData = Ordenar-WeaponData -dados $weaponData -criterio $criterioOrdenacao -ordem $ordemAtual
+        # Aplica o Filtro Avançado (Ocultar armas)
+        $filteredData = $weaponData
+        $isAdvancedFilterActive = $false
+        if ($script:weaponFilters.SelectedValues.Keys.Count -gt 0) {
+            $isAdvancedFilterActive = $true
+            foreach($key in $script:weaponFilters.SelectedValues.Keys){
+                $valuesToHide = $script:weaponFilters.SelectedValues[$key]
+                if($valuesToHide -and $valuesToHide.Count -gt 0){
+                    # Filtra removendo itens que tenham o valor na lista de ocultos
+                    $filteredData = $filteredData | Where-Object { $_.$key -notin $valuesToHide }
+                }
+            }
+        }
+
+        $sortedData = Ordenar-WeaponData -dados $filteredData -criterio $criterioOrdenacao -ordem $ordemAtual
         
         Clear-Host
         Write-Host "=== Busca de armas com filtro ==="; Write-Host
         
-        Write-Host "Botoes: " -NoNewline; Write-Host "F1" -ForegroundColor Cyan -NoNewline; Write-Host " - Mudar Criterio ($criterioOrdenacao) | " -NoNewline; Write-Host "F2" -ForegroundColor Yellow -NoNewline; Write-Host " - Mudar Ordem ($ordemAtual)"
-        Write-Host "Botoes: " -NoNewline; Write-Host "F5" -ForegroundColor Magenta -NoNewline; Write-Host " - Ver legenda | " -NoNewline; Write-Host "F6" -ForegroundColor Red -NoNewline; Write-Host " - Voltar ao menu"
-        Write-Host "Filtro: " -NoNewline; Write-Host "F3" -ForegroundColor Green -NoNewline; Write-Host " - Categoria ($filtroCategoriaDisplay) | " -NoNewline; Write-Host "F4" -ForegroundColor Blue -NoNewline; Write-Host " - Calibre ($filtroCalibre)"; Write-Host
+        # Linha 1 de botões
+        Write-Host "Botoes: " -NoNewline
+        Write-Host "F1" -ForegroundColor Cyan -NoNewline; Write-Host " - Mudar Criterio ($criterioOrdenacao) | " -NoNewline
+        Write-Host "F2" -ForegroundColor Yellow -NoNewline; Write-Host " - Mudar Ordem ($ordemAtual)"
+        
+        # Linha 2 de botões (Novos botões)
+        $statusF3 = if ($isAdvancedFilterActive) { "(Ligado)" } else { "(Desligado)" }
+        Write-Host "Botoes: " -NoNewline
+        Write-Host "F3" -ForegroundColor $(if ($isAdvancedFilterActive) {'Magenta'} else {'DarkGray'}) -NoNewline; Write-Host " - Ocultar armas $statusF3 | " -NoNewline
+        Write-Host "F4" -ForegroundColor Yellow -NoNewline; Write-Host " - Ver legenda | " -NoNewline
+        Write-Host "F5" -ForegroundColor Red -NoNewline; Write-Host " - Voltar ao menu"; Write-Host
+
+        # Cabeçalho da Tabela
         if ($criterioOrdenacao -eq "Alfabetico") { Write-Host ("{0,-17}" -f "Nome da Arma") -ForegroundColor Green -NoNewline } else { Write-Host ("{0,-17}" -f "Nome da Arma") -NoNewline }
         Write-Host " " -NoNewline; if ($criterioOrdenacao -eq "Calibre") { Write-Host ("{0,-12}" -f "Calibre") -ForegroundColor Green -NoNewline } else { Write-Host ("{0,-12}" -f "Calibre") -NoNewline }
         Write-Host " " -NoNewline; if ($criterioOrdenacao -eq "Controle de recuo vertical") { Write-Host ("{0,-4}" -f "CRV") -ForegroundColor Green -NoNewline } else { Write-Host ("{0,-4}" -f "CRV") -NoNewline }
@@ -2694,10 +2839,9 @@ function Search-WeaponsWithFilters {
         Write-Host " " -NoNewline; if ($criterioOrdenacao -eq "Melhoria de cano") { Write-Host ("{0,-9}" -f "Melh.Cano") -ForegroundColor Green } else { Write-Host ("{0,-9}" -f "Melh.Cano") }
         
         Write-Host "----------------- ------------ ---- ---- ---- ------- ---- ------- ------ ------- ----------------- ---   ----------- ---------"
-        foreach ($item in $weaponData) {
-            $modoDisparoDisplay = $item.ModoDisparo.Replace('Bolt-Action', 'A.Ferrolho').Replace('Pump-Action', 'A.Bombeamento').Replace('Full', 'Auto')
-            $poderFogoDisplay = switch ($item.PoderFogo) { "Low"{"Baixo"};"Mid-Low"{"Medio-Baixo"};"Medium"{"Medio"};"Mid-High"{"Medio-Alto"};"High"{"Alto"};default{$item.PoderFogo} }
-            $canoDisplay = switch ($item.Cano) { "Default +"{ "Padrao +" };"FB"{"CF"};"R+"{"A+"};"FB D+"{"CF D+"};"FB D-"{"CF D-"};"D+ R+"{"D+ A+"};default{$item.Cano} }
+        
+        # Loop de Exibição dos Dados
+        foreach ($item in $sortedData) {
             Write-Host ("{0,-17}" -f $item.Nome) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Alfabetico") { 'Green' } else { $Host.UI.RawUI.ForegroundColor }); Write-Host " " -NoNewline
             Write-Host ("{0,-12}" -f $item.Calibre) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Calibre") { 'Green' } else { $Host.UI.RawUI.ForegroundColor }); Write-Host " " -NoNewline
             Write-Host ("{0,-4}" -f $item.VerticalRecoil) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Controle de recuo vertical") { 'Green' } else { $Host.UI.RawUI.ForegroundColor }); Write-Host " " -NoNewline
@@ -2708,36 +2852,46 @@ function Search-WeaponsWithFilters {
             Write-Host ("{0,-7}" -f $item.Estabilidade) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Estabilidade sem mirar") { 'Green' } else { $Host.UI.RawUI.ForegroundColor }); Write-Host " " -NoNewline
             Write-Host ("{0,-6}" -f $item.Alcance) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Distancia Efetiva") { 'Green' } else { $Host.UI.RawUI.ForegroundColor }); Write-Host " " -NoNewline
             Write-Host ("{0,-7}" -f $item.Velocidade) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Velocidade de Saida") { 'Green' } else { $Host.UI.RawUI.ForegroundColor }); Write-Host " " -NoNewline
-            Write-Host ("{0,-17}" -f $modoDisparoDisplay) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Modo de disparo") { 'Green' } else { $Host.UI.RawUI.ForegroundColor }); Write-Host " " -NoNewline
+            Write-Host ("{0,-17}" -f $item.ModoDisparoDisplay) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Modo de disparo") { 'Green' } else { $Host.UI.RawUI.ForegroundColor }); Write-Host " " -NoNewline
             Write-Host ("{0,-5}" -f $item.Cadencia) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Cadencia") { 'Green' } else { $Host.UI.RawUI.ForegroundColor }); Write-Host " " -NoNewline
-            Write-Host ("{0,-11}" -f $poderFogoDisplay) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Poder de fogo") { 'Green' } else { $Host.UI.RawUI.ForegroundColor }); Write-Host " " -NoNewline
-            Write-Host ("{0,-9}" -f $canoDisplay) -ForegroundColor $(if ($criterioOrdenacao -eq "Melhoria de cano") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
+            Write-Host ("{0,-11}" -f $item.PoderFogoDisplay) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Poder de fogo") { 'Green' } else { $Host.UI.RawUI.ForegroundColor }); Write-Host " " -NoNewline
+            Write-Host ("{0,-9}" -f $item.CanoDisplay) -ForegroundColor $(if ($criterioOrdenacao -eq "Melhoria de cano") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
         }
+        
         $key = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
         switch ($key.VirtualKeyCode) {
-            112 { 
+            112 { # F1
                 (Get-Host).UI.RawUI.CursorSize = $originalCursorSize; $novoCriterio = Show-Menu -Title "Selecione o criterio" -Options $criterios -FlickerFree; (Get-Host).UI.RawUI.CursorSize = 0; if ($novoCriterio) { $criterioOrdenacao = $novoCriterio }
             }
-            113 { $ordemAtual = if ($ordemAtual -eq "Decrescente") { "Crescente" } else { "Decrescente" } }
-            114 { 
-                (Get-Host).UI.RawUI.CursorSize = $originalCursorSize
-                $novaCategoriaDisplay = Show-Menu -Title "Selecione a categoria" -Options $categorias -FlickerFree
-                (Get-Host).UI.RawUI.CursorSize = 0
-                if ($novaCategoriaDisplay) {
-                    $filtroCategoriaDisplay = $novaCategoriaDisplay
-                    if ($novaCategoriaDisplay -eq "Todas as armas") {
-                        $filtroCategoria = "Todas as armas"
-                    } else {
-                        $filtroCategoria = $global:PortugueseToWeaponClassMap[$novaCategoriaDisplay]
-                    }
-                    $filtroCalibre = "Todos os calibres" 
+            113 { # F2
+                $ordemAtual = if ($ordemAtual -eq "Decrescente") { "Crescente" } else { "Decrescente" } 
+            }
+            114 { # F3 - Ocultar Armas (Novo)
+                # Definição das colunas com espaçamento e nomes CORRIGIDOS
+                $filterDefs = @(
+                    @{ Label = "Categoria";        Property = "ClasseDisplay";      Width = 27 },
+                    @{ Label = "Calibre";          Property = "Calibre";            Width = 18 },
+                    @{ Label = "Modo de disparo";  Property = "ModoDisparoDisplay"; Width = 24 },
+                    @{ Label = "Poder de fogo";    Property = "PoderFogoDisplay";   Width = 20; CustomSortOrder = @("Baixo", "Medio-Baixo", "Medio", "Medio-Alto", "Alto") },
+                    @{ Label = "Melhoria de Cano"; Property = "CanoDisplay";        Width = 22; CustomSortOrder = @("CF D-", "Custom", "CF", "CF D+", "Padrao +", "A+", "D+", "D+ A+") }
+                )
+                
+                $updatedFilters = Show-ItemFilterScreen -Title "Filtro de Armas" -AllItems $weaponData -FilterDefinitions $filterDefs -CurrentFilters $script:weaponFilters
+                if ($updatedFilters) {
+                    $script:weaponFilters = $updatedFilters
+                } else { 
+                    # Se cancelar (F2), limpa os filtros
+                    $script:weaponFilters = @{ SelectedValues = @{}; SelectionMethod = @{} }
                 }
+                (Get-Host).UI.RawUI.CursorSize = 0
             }
-            115 { 
-                (Get-Host).UI.RawUI.CursorSize = $originalCursorSize; $caliberMenuOptions = @("Todos os calibres") + $calibresDisponiveis; $novoCalibre = Show-Menu -Title "Selecione o Calibre ($filtroCategoriaDisplay)" -Options $caliberMenuOptions -FlickerFree; (Get-Host).UI.RawUI.CursorSize = 0; if ($novoCalibre) { $filtroCalibre = $novoCalibre }
+            115 { # F4 - Ver Legenda (Antigo F5)
+                Show-WeaponLegend; continue 
             }
-            116 { Show-WeaponLegend; continue }
-            117 { (Get-Host).UI.RawUI.CursorSize = $originalCursorSize; return }
+            116 { # F5 - Voltar (Antigo F6)
+                $script:weaponFilters = @{ SelectedValues = @{}; SelectionMethod = @{} } # Limpa filtro ao sair
+                (Get-Host).UI.RawUI.CursorSize = $originalCursorSize; return 
+            }
         }
     } while ($true)
 }
@@ -6548,4 +6702,3 @@ function Show-MainMenu {
 }
 
 Show-MainMenu
-
