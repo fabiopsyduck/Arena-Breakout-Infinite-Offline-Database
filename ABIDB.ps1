@@ -23,7 +23,7 @@ $defaultCalibers = @(
     "9x19mm", "9x39mm", "12x70mm", ".44", ".45", ".338"
 )
 
-$global:ScriptVersion = "0.9.4"
+$global:ScriptVersion = "0.9.5"
 $global:GitHubApiUrl = "https://api.github.com/repos/fabiopsyduck/Arena-Breakout-Infinite-Offline-Database/releases/latest"
 $global:GitHubReleasePageUrl = "https://github.com/fabiopsyduck/Arena-Breakout-Infinite-Offline-Database/releases/latest"
 
@@ -2311,15 +2311,13 @@ function Show-AmmoFilterScreen {
     Write-Host ("  {0,-25}   {1,-25}   {2,-25}" -f ("-"*24), ("-"*24), ("-"*24))
     $startY = [Console]::CursorTop
     
-    # --- NOVA LOGICA 'ANTI-DEADLOCK' ---
+    # --- LOGICA ANTI-DEADLOCK ---
     $function:UpdateAutoSelection = {
-        # 1. Atualizar Niveis (Auto)
         foreach ($lvl in $penetrationLevels) {
             $items = $allAmmoCache | Where-Object { $_.Level -eq $lvl }
             $shouldHide = $false
-            if ($items.Count -eq 0) { $shouldHide = $true } # Se nao existe no DB, esconde
+            if ($items.Count -eq 0) { $shouldHide = $true } 
             else {
-                # So esconde AUTO se estiver coberto por MANUAL nas outras colunas
                 $allHiddenByManual = $true
                 foreach ($i in $items) {
                     $calManual = $selMethod["C:$($i.Caliber)"] -eq "Manual"
@@ -2333,7 +2331,6 @@ function Show-AmmoFilterScreen {
             else { if ($selMethod["L:$lvl"] -eq "Auto") { $selLevels.Remove($lvl); $selMethod.Remove("L:$lvl") } }
         }
 
-        # 2. Atualizar Calibres (Auto)
         foreach ($cal in $allCalibers) {
             $items = $allAmmoCache | Where-Object { $_.Caliber -eq $cal }
             $shouldHide = $false
@@ -2352,7 +2349,6 @@ function Show-AmmoFilterScreen {
             else { if ($selMethod["C:$cal"] -eq "Auto") { $selCalibers.Remove($cal); $selMethod.Remove("C:$cal") } }
         }
 
-        # 3. Atualizar Chance de Ferir (Auto)
         foreach ($wound in $woundOptions) {
             $items = $allAmmoCache | Where-Object { $_.Wound -eq $wound }
             $shouldHide = $false
@@ -2376,7 +2372,6 @@ function Show-AmmoFilterScreen {
         param($i)
         [Console]::SetCursorPosition(0, $startY + $i)
         
-        # Coluna 1: Niveis
         $bg1 = if ($currentColumn -eq 0 -and $i -eq $levelIndex) { 'DarkGray' } else { $Host.UI.RawUI.BackgroundColor }
         if ($i -lt $penetrationLevels.Count) {
             $val = $penetrationLevels[$i]; $chk = if ($val -in $selLevels) { "X" } else { " " }
@@ -2386,7 +2381,6 @@ function Show-AmmoFilterScreen {
             Write-Host (" " * (22 - "$val".Length)) -NoNewline -BackgroundColor $Host.UI.RawUI.BackgroundColor
         } else { Write-Host (" " * 28) -NoNewline }
         
-        # Coluna 2: Calibres
         $bg2 = if ($currentColumn -eq 1 -and $i -eq $caliberIndex) { 'DarkGray' } else { $Host.UI.RawUI.BackgroundColor }
         if ($i -lt $allCalibers.Count) {
             $val = $allCalibers[$i]; $chk = if ($val -in $selCalibers) { "X" } else { " " }
@@ -2396,7 +2390,6 @@ function Show-AmmoFilterScreen {
             $pad = 22 - $val.Length; if($pad-lt 0){$pad=0}; Write-Host (" " * $pad) -NoNewline -BackgroundColor $Host.UI.RawUI.BackgroundColor
         } else { Write-Host (" " * 28) -NoNewline }
 
-        # Coluna 3: Chance
         $bg3 = if ($currentColumn -eq 2 -and $i -eq $woundIndex) { 'DarkGray' } else { $Host.UI.RawUI.BackgroundColor }
         if ($i -lt $woundOptions.Count) {
             $val = $woundOptions[$i]; $chk = if ($val -in $selWounds) { "X" } else { " " }
@@ -2409,13 +2402,19 @@ function Show-AmmoFilterScreen {
     
     & $function:UpdateAutoSelection
     for ($i = 0; $i -lt $maxRows; $i++) { & $function:DrawRow $i }
-    $footerY = $startY + $maxRows; [Console]::SetCursorPosition(0, $footerY)
-    Write-Host; Write-Host; Write-Host "[Cima/Baixo] Move | [Esq/Dir] Troca Coluna | [Enter] Marca"
-    Write-Host "Aperte F1 para salvar | Aperte F2 para cancelar"
+    
+    $footerY = $startY + $maxRows
+    [Console]::SetCursorPosition(0, $footerY)
+    
+    # --- RODAPE PADRONIZADO ---
+    Write-Host; Write-Host
+    Write-Host "[Cima/Baixo] Move | [Esq/Dir] Troca Coluna | [Enter] Marca/Desmarca"
+    Write-Host "Pressione " -NoNewline; Write-Host "F1" -ForegroundColor Blue -NoNewline; Write-Host " para Salvar e Voltar"
+    Write-Host "Pressione " -NoNewline; Write-Host "F2" -ForegroundColor Red -NoNewline; Write-Host " para Cancelar/Resetar e Voltar"
     
     do {
         $oldL = $levelIndex; $oldC = $caliberIndex; $oldW = $woundIndex; $oldCol = $currentColumn
-        [Console]::SetCursorPosition(0, $footerY + 4)
+        [Console]::SetCursorPosition(0, $footerY + 5) # Ajustado para +5 devido as linhas extras do rodape
         $key = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown").VirtualKeyCode
         $update = $false
         switch ($key) {
@@ -2483,7 +2482,8 @@ function Search-WithFilters {
                 $c = @(Get-Content $_.FullName -TotalCount 2)
                 if ($c.Count -ge 2) { if ($c[0].Trim() -eq $filtroCategoria) { $c[1].Trim() } }
             } | Select-Object -Unique
-            if ($validCalibers) { $calibresToScan.AddRange($validCalibers) }
+            
+            if ($validCalibers) { $calibresToScan.AddRange(@($validCalibers)) }
         }
         else { $calibresToScan.AddRange((Get-ChildItem -Path $AmmoPath -Directory | Select-Object -ExpandProperty Name)) }
 
@@ -6637,5 +6637,3 @@ function Show-MainMenu {
 }
 
 Show-MainMenu
-
-
