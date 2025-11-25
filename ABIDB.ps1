@@ -23,7 +23,7 @@ $defaultCalibers = @(
     "9x19mm", "9x39mm", "12x70mm", ".44", ".45", ".338"
 )
 
-$global:ScriptVersion = "0.9.5"
+$global:ScriptVersion = "0.9.6"
 $global:GitHubApiUrl = "https://api.github.com/repos/fabiopsyduck/Arena-Breakout-Infinite-Offline-Database/releases/latest"
 $global:GitHubReleasePageUrl = "https://github.com/fabiopsyduck/Arena-Breakout-Infinite-Offline-Database/releases/latest"
 
@@ -2152,10 +2152,8 @@ function Show-ItemFilterScreen {
     foreach ($def in $FilterDefinitions) {
         $uniqueValues = $AllItems | Select-Object -ExpandProperty $def.Property -Unique | ForEach-Object { if ([string]::IsNullOrWhiteSpace($_)) { "/////" } else { $_ } }
         $sortedValues = if ($def.ContainsKey('CustomSortOrder')) {
-            # Usa a ordem customizada se ela for fornecida
             $def.CustomSortOrder | Where-Object { $_ -in $uniqueValues }
         } else {
-            # Caso contrário, usa a ordem alfabética/numérica padrão
             $uniqueValues | Sort-Object
         }
         $columns += @{
@@ -2168,7 +2166,6 @@ function Show-ItemFilterScreen {
     $currentColumnIndex = 0
     Clear-Host 
     :filterLoop while ($true) {
-        # Lógica de filtro "inteligente"
         $filteredItems = $AllItems; $manualFiltersApplied = $false
         if ($tempFilters.SelectedValues.Keys.Count -gt 0) {
             foreach ($propName in $tempFilters.SelectedValues.Keys) {
@@ -2191,7 +2188,6 @@ function Show-ItemFilterScreen {
         }
         
         [Console]::SetCursorPosition(0, 0)
-        # Redesenha o cabeçalho
         $header = ""; $separator = ""
         foreach ($col in $columns) {
             $width = $col.Definition.Width; $formatString = ("{{0,-{0}}}" -f $width)
@@ -2201,7 +2197,6 @@ function Show-ItemFilterScreen {
         }
         Write-Host "=== $Title (Marque o que deseja OCULTAR) ===" -ForegroundColor Yellow
         Write-Host; Write-Host $header; Write-Host $separator
-        # Redesenha a tabela
         for ($i = 0; $i -lt $maxRows; $i++) {
             Write-Host "  " -NoNewline
             for ($colIdx = 0; $colIdx -lt $columns.Count; $colIdx++) {
@@ -2218,8 +2213,16 @@ function Show-ItemFilterScreen {
                     $check = if ($isSelected) { "X" } else { " " }
                     $cellContent = "$prefix [$check] $value"
                     
-                    $bgColor = if ($colIdx -eq $currentColumnIndex -and $i -eq $col.SelectedIndex) { 'DarkGray' } else { $Host.UI.RawUI.BackgroundColor }
-                    $fgColor = if ($isAuto) { 'DarkGray' } elseif ($isManual) { 'DarkYellow' } else { $Host.UI.RawUI.ForegroundColor }
+                    $isRowSelected = ($colIdx -eq $currentColumnIndex -and $i -eq $col.SelectedIndex)
+                    $bgColor = if ($isRowSelected) { 'DarkGray' } else { $Host.UI.RawUI.BackgroundColor }
+                    
+                    $fgColor = if ($isAuto) { 
+                        if ($isRowSelected) { 'White' } else { 'DarkGray' }
+                    } elseif ($isManual) { 
+                        'DarkYellow' 
+                    } else { 
+                        $Host.UI.RawUI.ForegroundColor 
+                    }
                     
                     Write-Host "$($prefix) [" -NoNewline -BackgroundColor $bgColor
                     Write-Host $check -NoNewline -BackgroundColor $bgColor -ForegroundColor $fgColor
@@ -2232,7 +2235,6 @@ function Show-ItemFilterScreen {
             }
             Write-Host
         }
-        # Redesenha o rodapé
         Write-Host; Write-Host "[Cima/Baixo] Move | [Esq/Dir] Troca Coluna | [Enter] Marca/Desmarca"
         Write-Host "Pressione " -NoNewline; Write-Host "F1" -ForegroundColor Blue -NoNewline; Write-Host " para Salvar e Voltar"
         Write-Host "Pressione " -NoNewline; Write-Host "F2" -ForegroundColor Red -NoNewline; Write-Host " para Cancelar/Resetar e Voltar"
@@ -2250,11 +2252,11 @@ function Show-ItemFilterScreen {
                     if ($tempFilters.SelectionMethod["${propName}_${valueToToggle}"] -eq "Manual") { $tempFilters.SelectedValues[$propName].Remove($valueToToggle); $tempFilters.SelectionMethod.Remove("${propName}_${valueToToggle}") }
                 } else { $tempFilters.SelectedValues[$propName].Add($valueToToggle) | Out-Null; $tempFilters.SelectionMethod["${propName}_${valueToToggle}"] = "Manual" }
             }
-            112 { # F1 - Salvar
+            112 { 
                 $CurrentFilters.SelectedValues = $tempFilters.SelectedValues; $CurrentFilters.SelectionMethod = $tempFilters.SelectionMethod
                 (Get-Host).UI.RawUI.CursorSize = $originalCursorSize; return $CurrentFilters
             }
-            113 { # F2 - Cancelar
+            113 { 
                 (Get-Host).UI.RawUI.CursorSize = $originalCursorSize; return $null
             }
         }
@@ -3322,7 +3324,7 @@ function Search-HelmetsWithFilters {
                 $ordemAtual = if ($ordemAtual -eq "Decrescente") { "Crescente" } else { "Decrescente" }
             }
             114 { # F3
-                $headerLayout = "  Classe (Cl)  Bloqueio         Area Protegida                 Ricochete     Acessorio          Cl Max Masc"
+                $headerLayout = "  Classe (Cl)  Bloqueio Sonoro   Area Protegida                 Ricochete     Acessorio          Mascara (Classe Maxima)"
                 
                 $columnLabels = ($headerLayout -split '\s{2,}' | Where-Object {$_})
                 $startPositions = @(); foreach ($label in $columnLabels) { $startPositions += $headerLayout.IndexOf($label) }
@@ -3463,7 +3465,7 @@ function Search-BodyArmorsWithFilters {
                 $ordemAtual = if ($ordemAtual -eq "Decrescente") { "Crescente" } else { "Decrescente" }
             }
             114 { # F3
-                $headerLayout = "  Cl        Area Protegida"
+                $headerLayout = "  Classe de Blindagem        Area Protegida"
                 
                 $columnLabels = ($headerLayout -split '\s{2,}' | Where-Object {$_})
                 $startPositions = @(); foreach ($label in $columnLabels) { $startPositions += $headerLayout.IndexOf($label) }
@@ -3609,7 +3611,7 @@ function Search-ArmoredRigsWithFilters {
                 $ordemAtual = if ($ordemAtual -eq "Decrescente") { "Crescente" } else { "Decrescente" }
             }
             114 { # F3
-                $headerLayout = "  Cl        Area Protegida"
+                $headerLayout = "  Classe de Blindagem        Area Protegida"
                 
                 $columnLabels = ($headerLayout -split '\s{2,}' | Where-Object {$_})
                 $startPositions = @(); foreach ($label in $columnLabels) { $startPositions += $headerLayout.IndexOf($label) }
@@ -4132,7 +4134,6 @@ function Search-BackpacksWithFilters {
 }
 
 function Compare-Weapons {
-    # Mapas para comparar e traduzir atributos não-numéricos
     $poderFogoMap = @{ "Low" = 1; "Mid-Low" = 2; "Medium" = 3; "Mid-High" = 4; "High" = 5 }
     $canoMap = @{ "FB D-" = 1; "Custom" = 2; "FB" = 3; "FB D+" = 4; "Default +" = 5; "R+" = 6; "D+" = 6; "D+ R+" = 7 }
     :mainCompareLoop while ($true) {
@@ -4141,15 +4142,18 @@ function Compare-Weapons {
         if (-not $weaponCountSelection -or $weaponCountSelection -eq $global:ACTION_BACK) { return }
         $weaponCount = [int]$weaponCountSelection
         $selectedWeapons = @()
+        $alreadySelectedNames = @()
+
         for ($i = 1; $i -le $weaponCount; $i++) {
             $weaponFile = $null
             while (-not $weaponFile) {
-                $weaponFile = Select-WeaponForComparison -Title "Comparar Armas ($i/$weaponCount)" -Prompt "Selecione a $($i) ARMA"
+                $weaponFile = Select-WeaponForComparison -Title "Comparar Armas ($i/$weaponCount)" -Prompt "Selecione a $($i) ARMA" -ExcludedNames $alreadySelectedNames
                 if ($weaponFile -eq $global:ACTION_BACK) { continue mainCompareLoop }
             }
             $selectedWeapons += $weaponFile
+            $alreadySelectedNames += $weaponFile.BaseName
         }
-        # Carregar dados das armas em um array
+        
         $weaponDataArray = @()
         foreach ($weapon in $selectedWeapons) {
             $content = Get-Content -Path $weapon.FullName
@@ -4273,27 +4277,61 @@ function Compare-Weapons {
 function Select-WeaponForComparison {
     param (
         [string]$Title,
-        [string]$Prompt
+        [string]$Prompt,
+        [array]$ExcludedNames = @()
     )
     
-    # 1. Traduz as classes para português para exibir no menu
     $translatedClasses = $weaponClasses | ForEach-Object { $global:WeaponClassToPortugueseMap[$_] } | Sort-Object
     $selectedClassDisplay = Show-Menu -Title $Title -Options $translatedClasses -FlickerFree -EnableF1BackButton -F1HelpOnTop
     
     if (-not $selectedClassDisplay -or $selectedClassDisplay -eq $global:ACTION_BACK) { return $global:ACTION_BACK }
-    # 2. Traduz a seleção de volta para o inglês para usar na lógica interna
+    
     $selectedClass = $global:PortugueseToWeaponClassMap[$selectedClassDisplay]
-    # 3. Usa o nome em inglês para filtrar os arquivos
+    
     $weaponFiles = Get-ChildItem -Path $weaponsPath -Filter "*.txt" -File | Where-Object { (Get-Content $_.FullName -TotalCount 1) -eq $selectedClass }
     if (-not $weaponFiles) {
         Write-Host "Nenhuma arma encontrada nesta classe." -ForegroundColor Yellow; Start-Sleep -Seconds 2; return $null
     }
     
-    $weaponOptions = $weaponFiles | Select-Object -ExpandProperty BaseName | Sort-Object
-    $selectedWeaponName = Show-Menu -Title "$Prompt ($selectedClassDisplay)" -Options $weaponOptions -FlickerFree -EnableF1BackButton -F1HelpOnTop
+    $weaponListInfo = @()
+    $maxNameLength = 0
     
-    if (-not $selectedWeaponName -or $selectedWeaponName -eq $global:ACTION_BACK) { return $null }
-    return Get-Item -Path (Join-Path $weaponsPath "$selectedWeaponName.txt")
+    foreach ($file in $weaponFiles) {
+        if ($file.BaseName -in $ExcludedNames) { continue }
+
+        $content = Get-Content -Path $file.FullName -TotalCount 2
+        $cal = if ($content.Count -ge 2) { $content[1] } else { "Calibre Desconhecido" }
+        $name = $file.BaseName
+        
+        if ($name.Length -gt $maxNameLength) { $maxNameLength = $name.Length }
+        
+        $weaponListInfo += [PSCustomObject]@{
+            Name = $name
+            Caliber = $cal
+        }
+    }
+
+    if ($weaponListInfo.Count -eq 0) {
+        Write-Host "Todas as armas desta classe ja foram selecionadas." -ForegroundColor Yellow; Start-Sleep -Seconds 2; return $null
+    }
+    
+    $menuOptions = @()
+    $displayToRealNameMap = @{}
+    
+    foreach ($info in $weaponListInfo) {
+        $displayString = "{0,-$maxNameLength}   ({1})" -f $info.Name, $info.Caliber
+        $menuOptions += $displayString
+        $displayToRealNameMap[$displayString] = $info.Name
+    }
+    
+    $menuOptions = $menuOptions | Sort-Object
+    
+    $selectedDisplayString = Show-Menu -Title "$Prompt ($selectedClassDisplay)" -Options $menuOptions -FlickerFree -EnableF1BackButton -F1HelpOnTop
+    
+    if (-not $selectedDisplayString -or $selectedDisplayString -eq $global:ACTION_BACK) { return $null }
+    
+    $realWeaponName = $displayToRealNameMap[$selectedDisplayString]
+    return Get-Item -Path (Join-Path $weaponsPath "$realWeaponName.txt")
 }
 
 function Show-AmmoTableForCaliber {
@@ -6554,35 +6592,67 @@ function Invoke-UpdateCheck {
         return
     }
 
-    $latestVersion = $latestRelease.tag_name.TrimStart('v')
+    $latestVersionString = $latestRelease.tag_name.TrimStart('v')
+
+    try {
+        $latestV  = [System.Version]$latestVersionString
+        $currentV = [System.Version]$global:ScriptVersion
+    } catch {
+        $latestV  = $latestVersionString
+        $currentV = $global:ScriptVersion
+    }
 
     do {
         Clear-Host
         Write-Host "=== Verificar Atualizacoes ==="; Write-Host
 
-        if ($latestVersion -eq $global:ScriptVersion) {
-            Write-Host "Verificacao concluida."
-            Write-Host; Write-Host "Voce ja esta com a versao mais recente do SCRIPT! (Versao $global:ScriptVersion)" -ForegroundColor Green
-            Write-Host; Write-Host "** IMPORTANTE: Esta verificacao e apenas para o SCRIPT (ABIDB.ps1). **"
-            Write-Host "** O seu banco de dados (pasta ""Database ABI"") NAO e verificado. **"
-            Write-Host; Write-Host "Voce pode pressionar F2 para visitar a pagina de releases"
-            Write-Host "e checar o TITULO da versao para ver se ha uma nova"
-            Write-Host "atualizacao do BANCO DE DADOS (ex: ""Database Update - 14/11/2025"")."
-            Write-Host; Write-Host "Link da Pagina:"; Write-Host $global:GitHubReleasePageUrl
-
-        } else {
+        if ($latestV -gt $currentV) {
             Write-Host "ATUALIZACAO DE SCRIPT ENCONTRADA!" -ForegroundColor Yellow
-            Write-Host; Write-Host "Uma nova versao ($latestVersion) esta disponivel." -ForegroundColor Yellow
+            Write-Host; Write-Host "Uma nova versao ($latestVersionString) esta disponivel." -ForegroundColor Yellow
             Write-Host "Sua versao atual e a $global:ScriptVersion."
-            Write-Host; Write-Host "** IMPORTANTE: Esta atualizacao e para o SCRIPT (ABIDB.ps1). **"
-            Write-Host "** O seu banco de dados (pasta ""Database ABI"") NAO sera alterado. **"
-            Write-Host; Write-Host "** DICA: Ao abrir a pagina, LEIA O TITULO da nova release. **"
-            Write-Host "** Ele indicara se uma nova versao do BANCO DE DADOS tambem esta inclusa. **"
+            
+            Write-Host; Write-Host "-----------------------------------------------------------------------" -ForegroundColor DarkGray
+            Write-Host "AVISO IMPORTANTE SOBRE O BANCO DE DADOS (DATABASE ABI):" -ForegroundColor Yellow
+            Write-Host "-----------------------------------------------------------------------" -ForegroundColor DarkGray
+            Write-Host "Este verificador checa APENAS a versao deste arquivo do script (.ps1)."
+            Write-Host "Ele " -NoNewline; Write-Host "NAO" -ForegroundColor Red -NoNewline; Write-Host " consegue verificar se a pasta ""Database ABI"" foi atualizada"
+            Write-Host "ou se possui os itens mais recentes."
+            Write-Host
+            Write-Host "COMO SABER SE PRECISA ATUALIZAR A DATABASE:" -ForegroundColor Cyan
+            Write-Host "1. Abra a pasta ""Database ABI"" e procure o arquivo de texto com a data."
+            Write-Host "   (Ex: ""Atualizado 24-11-2025.txt"")"
+            Write-Host "2. Ao abrir o link abaixo (F2), leia o TITULO da release para ver a"
+            Write-Host "   DATA do Banco de Dados e saber se foi atualizado ou nao."
+            Write-Host "-----------------------------------------------------------------------" -ForegroundColor DarkGray
+            
             Write-Host; Write-Host "Passos para atualizar o SCRIPT:"
-            Write-Host; Write-Host "1. Pressione F2 para abrir a pagina de download no seu navegador."
+            Write-Host "1. Pressione F2 para abrir a pagina de download no seu navegador."
             Write-Host "2. Baixe o novo arquivo ""ABIDB.ps1"" da pagina."
             Write-Host "3. Substitua o seu arquivo ""ABIDB.ps1"" antigo pelo novo."
             Write-Host "4. Feche e abra o script novamente."
+            Write-Host; Write-Host "Link da Pagina:"; Write-Host $global:GitHubReleasePageUrl
+
+        } else {
+            Write-Host "Verificacao concluida."
+            if ($currentV -gt $latestV) {
+                Write-Host; Write-Host "Voce esta usando uma versao SUPERIOR a do GitHub (Versao Dev/Beta: $global:ScriptVersion)" -ForegroundColor Cyan
+            } else {
+                Write-Host; Write-Host "Voce ja esta com a versao mais recente do SCRIPT! (Versao $global:ScriptVersion)" -ForegroundColor Green
+            }
+            
+            Write-Host; Write-Host "-----------------------------------------------------------------------" -ForegroundColor DarkGray
+            Write-Host "AVISO IMPORTANTE SOBRE O BANCO DE DADOS (DATABASE ABI):" -ForegroundColor Yellow
+            Write-Host "-----------------------------------------------------------------------" -ForegroundColor DarkGray
+            Write-Host "Este verificador checa APENAS a versao deste arquivo do script (.ps1)."
+            Write-Host "Ele " -NoNewline; Write-Host "NAO" -ForegroundColor Red -NoNewline; Write-Host " consegue verificar se a pasta ""Database ABI"" foi atualizada"
+            Write-Host "ou se possui os itens mais recentes."
+            Write-Host
+            Write-Host "COMO SABER A VERSAO DO SEU BANCO DE DADOS:" -ForegroundColor Cyan
+            Write-Host "1. Abra a pasta ""Database ABI"" que esta junto com este script."
+            Write-Host "2. Procure por um arquivo de texto com a data da ultima atualizacao."
+            Write-Host "   Exemplo: ""Atualizado 24-11-2025.txt"""
+            Write-Host "3. Compare essa data com a data da release no GitHub (Pressione F2)."
+            Write-Host "-----------------------------------------------------------------------" -ForegroundColor DarkGray
             Write-Host; Write-Host "Link da Pagina:"; Write-Host $global:GitHubReleasePageUrl
         }
         
