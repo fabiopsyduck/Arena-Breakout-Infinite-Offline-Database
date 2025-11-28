@@ -23,7 +23,7 @@ $defaultCalibers = @(
     "9x19mm", "9x39mm", "12x70mm", ".44", ".45", ".338"
 )
 
-$global:ScriptVersion = "0.9.6"
+$global:ScriptVersion = "0.9.7"
 $global:GitHubApiUrl = "https://api.github.com/repos/fabiopsyduck/Arena-Breakout-Infinite-Offline-Database/releases/latest"
 $global:GitHubReleasePageUrl = "https://github.com/fabiopsyduck/Arena-Breakout-Infinite-Offline-Database/releases/latest"
 
@@ -4485,9 +4485,8 @@ function View-Database {
         if ($selectedCategoryKey -eq "Ammo") {
             :caliberLoop while ($true) {
                 $calibers = Get-ChildItem -Path $AmmoPath -Directory | Select-Object -ExpandProperty Name | Sort-Object
-                $caliberMenuOptions = @("Voltar para categorias") + $calibers
-                $selectedCaliber = Show-Menu -Title "Selecione o calibre" -Options $caliberMenuOptions -FlickerFree
-                if (-not $selectedCaliber -or $selectedCaliber -eq "Voltar para categorias") { continue categoryLoop }
+                $selectedCaliber = Show-Menu -Title "Selecione o calibre" -Options $calibers -FlickerFree -EnableF1BackButton
+                if ($selectedCaliber -eq $global:ACTION_BACK -or -not $selectedCaliber) { continue categoryLoop }
                 
                 $ammoFiles = Get-ChildItem -Path (Join-Path $AmmoPath $selectedCaliber) -Filter "*.txt" -File
                 if (-not $ammoFiles) { Write-Host "Nenhuma municao encontrada." -ForegroundColor Yellow; Start-Sleep -Seconds 2; continue caliberLoop }
@@ -4505,21 +4504,20 @@ function View-Database {
                         Write-Host ("{0,-19} {1,-2} {2,-10} {3,-14} {4,-13} {5,-9} {6,-8} {7,-11} {8,-12} {9,-12}" -f $params)
                     }
                     
-                    Write-Host; Write-Host "Pressione F1 para voltar (Selecionar calibre)" -ForegroundColor Yellow; Write-Host "Pressione F2 para voltar ao menu principal" -ForegroundColor Red
+                    Write-Host; Write-Host "Pressione F1 para voltar (Selecionar calibre)" -ForegroundColor Yellow
                     $key = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown").VirtualKeyCode
-                    switch ($key) { 112 { continue caliberLoop } 113 { (Get-Host).UI.RawUI.CursorSize = $originalCursorSize; return } }
+                    switch ($key) { 
+                        112 { continue caliberLoop } 
+                    }
                 }
             }
         } elseif ($selectedCategoryKey -eq "Weapons") {
             :classLoop while ($true) {
-                # Traduz as classes para o menu de visualização
                 $translatedClasses = $weaponClasses | ForEach-Object { $global:WeaponClassToPortugueseMap[$_] } | Sort-Object
-                $classMenuOptions = @("Voltar para categorias") + $translatedClasses
-                $selectedWeaponClassDisplay = Show-Menu -Title "Selecione a classe da arma" -Options $classMenuOptions -FlickerFree
+                $selectedWeaponClassDisplay = Show-Menu -Title "Selecione a classe da arma" -Options $translatedClasses -FlickerFree -EnableF1BackButton
                 
-                if (-not $selectedWeaponClassDisplay -or $selectedWeaponClassDisplay -eq "Voltar para categorias") { continue categoryLoop }
+                if ($selectedWeaponClassDisplay -eq $global:ACTION_BACK -or -not $selectedWeaponClassDisplay) { continue categoryLoop }
                 
-                # Traduz de volta para o inglês para a lógica de filtro
                 $selectedWeaponClass = $global:PortugueseToWeaponClassMap[$selectedWeaponClassDisplay]
                 $itemPath = Join-Path -Path $global:databasePath -ChildPath $config.PathName
                 $weaponFiles = Get-ChildItem -Path $itemPath -Filter "*.txt" -File | Where-Object { (Get-Content -Path $_.FullName -TotalCount 1) -eq $selectedWeaponClass }
@@ -4528,7 +4526,6 @@ function View-Database {
                 :weaponsTableLoop while ($true) {
                     (Get-Host).UI.RawUI.CursorSize = 0
                     Clear-Host
-                    # Exibe o nome da classe em português
                     Write-Host "=== Dados de Weapons > $selectedWeaponClassDisplay ==="; Write-Host
                     Write-Host $config.ViewHeader
                     $separator = [regex]::Replace($config.ViewHeader, '\S', '-')
@@ -4541,9 +4538,12 @@ function View-Database {
                         Write-Host ($config.ViewFormat -f $params)
                     }
                     
-                    Write-Host; Write-Host "Pressione F1 para voltar (Selecionar classe)" -ForegroundColor Yellow; Write-Host "Pressione F2 para Ver legenda"; Write-Host "Pressione F3 para voltar ao menu principal" -ForegroundColor Red
+                    Write-Host; Write-Host "Pressione F1 para voltar (Selecionar classe)" -ForegroundColor Yellow; Write-Host "Pressione F2 para Ver legenda"
                     $key = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown").VirtualKeyCode
-                    switch ($key) { 112 { continue classLoop } 113 { Show-WeaponLegend } 114 { (Get-Host).UI.RawUI.CursorSize = $originalCursorSize; return } }
+                    switch ($key) { 
+                        112 { continue classLoop } 
+                        113 { Show-WeaponLegend } 
+                    }
                 }
             }
         } else {
@@ -4591,10 +4591,9 @@ function View-Database {
                         }
                     }
                 }
-                Write-Host; Write-Host "Pressione F1 para voltar (Selecionar categoria)" -ForegroundColor Yellow; Write-Host "Pressione F2 para voltar ao menu principal" -ForegroundColor Red
+                Write-Host; Write-Host "Pressione F1 para voltar (Selecionar categoria)" -ForegroundColor Yellow
                 $key = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown").VirtualKeyCode
                 if ($key -eq 112) { continue categoryLoop }
-                if ($key -eq 113) { (Get-Host).UI.RawUI.CursorSize = $originalCursorSize; return }
             }
         }
     }
@@ -6686,7 +6685,7 @@ function Show-MainMenu {
             "Sair"
         )
         
-        $selectedOption = Show-Menu -Title "Arena Breakout Infinite Offline Database 0.9.1 (Creator: Fabiopsyduck)" -Options $mainMenuOptions -FlickerFree
+        $selectedOption = Show-Menu -Title "Arena Breakout Infinite Offline Database 0.9.7 (Creator: Fabiopsyduck)" -Options $mainMenuOptions -FlickerFree
         
         switch ($selectedOption) {
             "Consultar Itens (Busca com Filtro)" { Show-ConsultasMenu }
