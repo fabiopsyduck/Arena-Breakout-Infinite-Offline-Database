@@ -10,7 +10,7 @@ O projeto **já inclui um banco de dados pré-carregado (`Database ABI`)** com d
 
 ## ✨ Recursos Principais
 
-  * **Banco de Dados Incluído:** Comece a usar imediatamente com uma base de dados completa (dados de 24/11/2025).
+  * **Banco de Dados Incluído:** Comece a usar imediatamente com uma base de dados completa (dados de 07/12/2025).
   * **Gerenciamento Completo (CRUD):** Adicione, edite e apague itens em mais de 19 categorias.
   * **Categorias Suportadas:**
       * Armas
