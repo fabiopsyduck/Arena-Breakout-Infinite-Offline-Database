@@ -23,7 +23,7 @@ $defaultCalibers = @(
     "9x19mm", "9x39mm", "12x70mm", ".44", ".45", ".338"
 )
 
-$global:ScriptVersion = "0.9.7"
+$global:ScriptVersion = "0.9.8"
 $global:GitHubApiUrl = "https://api.github.com/repos/fabiopsyduck/Arena-Breakout-Infinite-Offline-Database/releases/latest"
 $global:GitHubReleasePageUrl = "https://github.com/fabiopsyduck/Arena-Breakout-Infinite-Offline-Database/releases/latest"
 
@@ -582,16 +582,32 @@ function Ordenar-Dados {
 
 function Ordenar-WeaponData {
     param ($dados, $criterio, $ordem)
-    # Mapas para converter texto em valores numéricos para ordenação especial
+    
     $poderFogoMap = @{ "Low" = 1; "Mid-Low" = 2; "Medium" = 3; "Mid-High" = 4; "High" = 5 }
-    $canoMap = @{ "D+ R+" = 7; "R+" = 6; "Default +" = 5; "FB D+" = 4; "FB" = 3; "Custom" = 2; "FB D-" = 1 }
+    $canoMap = @{ "D+ R+" = 7; "R+" = 6; "Default +" = 5; "FB D+" = 4; "FB" = 2; "Custom" = 2; "FB D-" = 1 }
+    
+    $modoMap = @{
+        "Pump-Action" = 1
+        "Bolt-Action" = 1
+        "3-RB" = 2
+        "Semi" = 3
+        "Semi, 3-RB" = 3
+        "Full" = 4
+        "Semi, Full" = 4
+        "2-RB, Semi, Full" = 4
+        "3-RB, Semi, Full" = 4
+    }
+
     foreach ($item in $dados) {
         $item | Add-Member -MemberType NoteProperty -Name 'PoderFogoNum' -Value $poderFogoMap[$item.PoderFogo] -ErrorAction SilentlyContinue -Force
         $item | Add-Member -MemberType NoteProperty -Name 'CanoNum' -Value $canoMap[$item.Cano] -ErrorAction SilentlyContinue -Force
+        
+        $valModo = if ($modoMap.ContainsKey($item.ModoDisparo)) { $modoMap[$item.ModoDisparo] } else { 0 }
+        $item | Add-Member -MemberType NoteProperty -Name 'ModoDisparoNum' -Value $valModo -ErrorAction SilentlyContinue -Force
     }
+
     $propriedadePrimaria = switch ($criterio) {
         "Alfabetico"                   { "Nome" }
-        "Calibre"                      { "Calibre" }
         "Controle de recuo vertical"   { "VerticalRecoil" }
         "Controle de recuo horizontal" { "HorizontalRecoil" }
         "Ergonomia"                    { "Ergonomia" }
@@ -600,19 +616,17 @@ function Ordenar-WeaponData {
         "Estabilidade sem mirar"       { "Estabilidade" }
         "Distancia Efetiva"            { "Alcance" }
         "Velocidade de Saida"          { "Velocidade" }
-        "Modo de disparo"              { "ModoDisparo" }
+        "Modo de disparo"              { "ModoDisparoNum" }
         "Cadencia"                     { "Cadencia" }
         "Poder de fogo"                { "PoderFogoNum" }
         "Melhoria de cano"             { "CanoNum" }
     }
     
     $isDescending = ($ordem -eq "Decrescente")
+    
     $ordenacaoParams = @( @{ Expression = { $_."$propriedadePrimaria" }; Descending = $isDescending } )
+    
     switch ($criterio) {
-        "Calibre"      { 
-            $ordenacaoParams += @{ Expression = 'PoderFogoNum'; Descending = $isDescending }
-            $ordenacaoParams += @{ Expression = 'HorizontalRecoil'; Descending = $isDescending }
-        }
         "Controle de recuo vertical" { 
             $ordenacaoParams += @{ Expression = 'Precisao'; Descending = $isDescending }
             $ordenacaoParams += @{ Expression = 'HorizontalRecoil'; Descending = $isDescending }
@@ -646,7 +660,14 @@ function Ordenar-WeaponData {
             $ordenacaoParams += @{ Expression = 'HorizontalRecoil'; Descending = $isDescending }
         }
         "Velocidade de Saida" { $ordenacaoParams += @{ Expression = 'Alcance'; Descending = $isDescending } }
-        "Modo de disparo"  { $ordenacaoParams += @{ Expression = 'PoderFogoNum'; Descending = $isDescending } }
+        
+        "Modo de disparo"  { 
+            $ordenacaoParams += @{ Expression = 'PoderFogoNum'; Descending = $isDescending } 
+            $ordenacaoParams += @{ Expression = 'Cadencia'; Descending = $isDescending }
+            $ordenacaoParams += @{ Expression = 'Alcance'; Descending = $isDescending }
+            $ordenacaoParams += @{ Expression = 'HorizontalRecoil'; Descending = $isDescending }
+        }
+        
         "Cadencia"          { $ordenacaoParams += @{ Expression = 'PoderFogoNum'; Descending = $isDescending } }
         "Poder de fogo"    { 
             $ordenacaoParams += @{ Expression = 'Velocidade'; Descending = $isDescending } 
@@ -850,20 +871,19 @@ function Ordenar-HelmetData {
         $item | Add-Member -MemberType NoteProperty -Name 'ClMaxMascNum' -Value $clMaxMascNumValue -Force
     }
     $propriedadePrimaria = switch ($criterio) {
-        "Alfabetico"              { "Nome" }
-        "Peso"                    { "Weight" }
-        "Durabilidade"            { "Durability" }
-        "Classe de Blindagem"     { "ArmorClass" }
-        "Cl Max Masc"             { "ClMaxMascNum" }
-        "Material"                { "Material" }
-        "Bloqueio"                { "BloqueioNum" }
-        "Penalidade de movimento" { "MovementSpeedNum" }
-        "Ergonomia"               { "ErgonomicsNum" }
-        "Area Protegida"          { "AreaNum" }
-        "Chance de Ricochete"     { "RicocheteNum" }
-        "Captura de som"          { "CaptadorNum" }
-        "Reducao de ruido"        { "ReducaoNum" }
-        "Acessorio"               { "AcessorioNum" }
+        "Alfabetico"                          { "Nome" }
+        "Peso"                                { "Weight" }
+        "Durabilidade"                        { "Durability" }
+        "Classe de Blindagem"                 { "ArmorClass" }
+        "Classe maxima da mascara compativel" { "ClMaxMascNum" }
+        "Bloqueio"                            { "BloqueioNum" }
+        "Penalidade de movimento"             { "MovementSpeedNum" }
+        "Ergonomia"                           { "ErgonomicsNum" }
+        "Area Protegida"                      { "AreaNum" }
+        "Chance de Ricochete"                 { "RicocheteNum" }
+        "Captura de som"                      { "CaptadorNum" }
+        "Reducao de ruido"                    { "ReducaoNum" }
+        "Acessorio"                           { "AcessorioNum" }
     }
     
     $isDescending = $true
@@ -887,18 +907,11 @@ function Ordenar-HelmetData {
             $ordenacaoParams += @{ Expression = 'BloqueioNum'; Descending = $false }
             $ordenacaoParams += @{ Expression = 'Weight'; Descending = $false }
         }
-        "Cl Max Masc" { 
+        "Classe maxima da mascara compativel" { 
             $ordenacaoParams += @{ Expression = 'ArmorClass'; Descending = $true }
             $ordenacaoParams += @{ Expression = 'Durability'; Descending = $true }
             $ordenacaoParams += @{ Expression = 'BloqueioNum'; Descending = $false }
             $ordenacaoParams += @{ Expression = 'Weight'; Descending = $false }
-        }
-        "Material"       { 
-            $ordenacaoParams += @{ Expression = 'ArmorClass'; Descending = $true }
-            $ordenacaoParams += @{ Expression = 'Durability'; Descending = $true }
-            $ordenacaoParams += @{ Expression = 'BloqueioNum'; Descending = $false }
-            $ordenacaoParams += @{ Expression = 'Weight'; Descending = $false }
-            $ordenacaoParams += @{ Expression = 'RicocheteNum'; Descending = $true }
         }
         "Bloqueio"       { 
             $ordenacaoParams += @{ Expression = 'ArmorClass'; Descending = $true }
@@ -1910,18 +1923,18 @@ function Show-HelpCriteriaTemplate {
         Clear-Host
         Write-Host "=== $Title ==="; Write-Host
         if ($WideHeader) {
-            Write-Host "Criterio Primario                       1 Desempate           2 Desempate                   3 Desempate"
-            Write-Host "--------------------------------------  --------------------  ----------------------------  ----------------"
+            Write-Host "Criterio Primario                           1 Desempate           2 Desempate                   3 Desempate"
+            Write-Host "------------------------------------------  --------------------  ----------------------------  ----------------"
         } else {
-            Write-Host "Criterio Primario     1 Desempate       2 Desempate                   3 Desempate"
-            Write-Host "--------------------  ----------------  ----------------------------  ----------------"
+            Write-Host "Criterio Primario         1 Desempate       2 Desempate                   3 Desempate"
+            Write-Host "------------------------  ----------------  ----------------------------  ----------------"
         }
         
         foreach ($item in $HelpData) {
             if ($WideHeader) {
-                $line = ("{0,-38}  {1,-20}  {2,-28}  {3,-16}" -f $item.'Criterio Primario', $item.'1 Desempate', $item.'2 Desempate', $item.'3 Desempate')
+                $line = ("{0,-42}  {1,-20}  {2,-28}  {3,-16}" -f $item.'Criterio Primario', $item.'1 Desempate', $item.'2 Desempate', $item.'3 Desempate')
             } else {
-                $line = ("{0,-20}  {1,-16}  {2,-28}  {3,-16}" -f $item.'Criterio Primario', $item.'1 Desempate', $item.'2 Desempate', $item.'3 Desempate')
+                $line = ("{0,-24}  {1,-16}  {2,-28}  {3,-16}" -f $item.'Criterio Primario', $item.'1 Desempate', $item.'2 Desempate', $item.'3 Desempate')
             }
             Write-Host $line
         }
@@ -1943,30 +1956,30 @@ function Show-AmmoHelpCriteria {
     (Get-Host).UI.RawUI.CursorSize = 0
     $helpData = @(
         [PSCustomObject]@{'Criterio Primario' = 'Alfabetico'; '1 Desempate' = 'Nivel (Lv)'; '2 Desempate' = 'Dano Base'; '3 Desempate' = '-'},
-        [PSCustomObject]@{'Criterio Primario' = 'Dano Base'; '1 Desempate' = 'Nivel (Lv)'; '2 Desempate' = 'Penetracao'; '3 Desempate' = '-'},
         [PSCustomObject]@{'Criterio Primario' = 'Nivel de penetracao'; '1 Desempate' = 'Dano Base'; '2 Desempate' = 'Penetracao'; '3 Desempate' = '-'},
-        [PSCustomObject]@{'Criterio Primario' = 'Chance de Ferir'; '1 Desempate' = 'Dano Base'; '2 Desempate' = 'Nivel (Lv)'; '3 Desempate' = 'Penetracao'},
+        [PSCustomObject]@{'Criterio Primario' = 'Penetracao'; '1 Desempate' = 'Nivel (Lv)'; '2 Desempate' = 'Dano Base'; '3 Desempate' = '-'},
+        [PSCustomObject]@{'Criterio Primario' = 'Dano Base'; '1 Desempate' = 'Nivel (Lv)'; '2 Desempate' = 'Penetracao'; '3 Desempate' = '-'},
+        [PSCustomObject]@{'Criterio Primario' = 'Dano de blindagem'; '1 Desempate' = 'Nivel (Lv)'; '2 Desempate' = 'Penetracao'; '3 Desempate' = '-'},
         [PSCustomObject]@{'Criterio Primario' = 'Velocidade inicial'; '1 Desempate' = 'Nivel (Lv)'; '2 Desempate' = 'Dano Base'; '3 Desempate' = '-'},
         [PSCustomObject]@{'Criterio Primario' = 'Precisao'; '1 Desempate' = 'Nivel (Lv)'; '2 Desempate' = 'Dano Base'; '3 Desempate' = 'Penetracao'},
-        [PSCustomObject]@{'Criterio Primario' = 'Penetracao'; '1 Desempate' = 'Nivel (Lv)'; '2 Desempate' = 'Dano Base'; '3 Desempate' = '-'},
-        [PSCustomObject]@{'Criterio Primario' = 'Dano de blindagem'; '1 Desempate' = 'Nivel (Lv)'; '2 Desempate' = 'Penetracao'; '3 Desempate' = '-'},
         [PSCustomObject]@{'Criterio Primario' = 'Controle de recuo vertical'; '1 Desempate' = 'Nivel (Lv)'; '2 Desempate' = 'Dano Base'; '3 Desempate' = 'Penetracao'},
-        [PSCustomObject]@{'Criterio Primario' = 'Controle de recuo horizontal'; '1 Desempate' = 'Nivel (Lv)'; '2 Desempate' = 'Dano Base'; '3 Desempate' = 'Penetracao'}
+        [PSCustomObject]@{'Criterio Primario' = 'Controle de recuo horizontal'; '1 Desempate' = 'Nivel (Lv)'; '2 Desempate' = 'Dano Base'; '3 Desempate' = 'Penetracao'},
+        [PSCustomObject]@{'Criterio Primario' = 'Chance de Ferir'; '1 Desempate' = 'Dano Base'; '2 Desempate' = 'Nivel (Lv)'; '3 Desempate' = 'Penetracao'}
     )
     do {
         Clear-Host
         Write-Host "=== Como Funcionam os Criterios (Busca de Municao) ==="; Write-Host
-        Write-Host "Criterio Primario                  1 Desempate       2 Desempate       3 Desempate"
-        Write-Host "---------------------------------  ----------------  ----------------  ----------------"
+        Write-Host "Criterio Primario                      1 Desempate       2 Desempate       3 Desempate"
+        Write-Host "-------------------------------------  ----------------  ----------------  ----------------"
         foreach ($item in $helpData) {
-            $line = ("{0,-33}  {1,-16}  {2,-16}  {3,-16}" -f $item.'Criterio Primario', $item.'1 Desempate', $item.'2 Desempate', $item.'3 Desempate')
+            $line = ("{0,-37}  {1,-16}  {2,-16}  {3,-16}" -f $item.'Criterio Primario', $item.'1 Desempate', $item.'2 Desempate', $item.'3 Desempate')
             Write-Host $line
         }
         Write-Host @"
 `nExplicacao:
 1. O sistema ordena primeiro pelo Criterio Primario selecionado.
 2. Em caso de empate, usa o 1 Desempate, depois o 2 e 3 se necessario.
-3. A ordem padrao e Decrescente (maior para menor), exceto para 'Alfabetico'.
+3. A ordem padrao e Crescente para todos os criterios nesta versao.
 "@
         Write-Host; Write-Host "Pressione " -NoNewline; Write-Host "F1" -ForegroundColor Yellow -NoNewline; Write-Host " para voltar..."
         $key = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown").VirtualKeyCode
@@ -1976,7 +1989,6 @@ function Show-AmmoHelpCriteria {
 
 function Show-WeaponHelpCriteria {
     $helpData = @(
-        [PSCustomObject]@{'Criterio Primario' = 'Calibre'; '1 Desempate' = 'Poder de fogo'; '2 Desempate' = 'Controle de recuo horizontal'; '3 Desempate' = '-'},
         [PSCustomObject]@{'Criterio Primario' = 'Controle de recuo vertical'; '1 Desempate' = 'Precisao'; '2 Desempate' = 'Controle de recuo horizontal'; '3 Desempate' = 'Cadencia'},
         [PSCustomObject]@{'Criterio Primario' = 'Controle de recuo horizontal'; '1 Desempate' = 'Precisao'; '2 Desempate' = 'Controle de recuo vertical'; '3 Desempate' = 'Cadencia'},
         [PSCustomObject]@{'Criterio Primario' = 'Ergonomia'; '1 Desempate' = 'Precisao'; '2 Desempate' = 'Cadencia'; '3 Desempate' = '-'},
@@ -1985,7 +1997,7 @@ function Show-WeaponHelpCriteria {
         [PSCustomObject]@{'Criterio Primario' = 'Estabilidade sem mirar'; '1 Desempate' = 'Precisao'; '2 Desempate' = 'Cadencia'; '3 Desempate' = '-'},
         [PSCustomObject]@{'Criterio Primario' = 'Distancia Efetiva'; '1 Desempate' = 'Velocidade de Saida'; '2 Desempate' = 'Cadencia'; '3 Desempate' = 'Controle de recuo horizontal'},
         [PSCustomObject]@{'Criterio Primario' = 'Velocidade de Saida'; '1 Desempate' = 'Distancia Efetiva'; '2 Desempate' = '-'; '3 Desempate' = '-'},
-        [PSCustomObject]@{'Criterio Primario' = 'Modo de disparo'; '1 Desempate' = 'Poder de fogo'; '2 Desempate' = '-'; '3 Desempate' = '-'},
+        [PSCustomObject]@{'Criterio Primario' = 'Modo de disparo'; '1 Desempate' = 'Poder de fogo'; '2 Desempate' = 'Cadencia'; '3 Desempate' = 'Distancia Efetiva'},
         [PSCustomObject]@{'Criterio Primario' = 'Cadencia'; '1 Desempate' = 'Poder de fogo'; '2 Desempate' = '-'; '3 Desempate' = '-'},
         [PSCustomObject]@{'Criterio Primario' = 'Poder de fogo'; '1 Desempate' = 'Velocidade de Saida'; '2 Desempate' = 'Cadencia'; '3 Desempate' = '-'},
         [PSCustomObject]@{'Criterio Primario' = 'Melhoria de cano'; '1 Desempate' = 'Poder de fogo'; '2 Desempate' = 'Distancia Efetiva'; '3 Desempate' = 'Cadencia'}
@@ -2044,28 +2056,26 @@ function Show-HelmetHelpCriteria {
     $helpData = @(
         [PSCustomObject]@{'Criterio Primario' = 'Peso'; '1 Desempate' = 'Classe (Cl)'; '2 Desempate' = 'Durabilidade'; '3 Desempate' = 'Bloqueio Sonoro'},
         [PSCustomObject]@{'Criterio Primario' = 'Durabilidade'; '1 Desempate' = 'Classe (Cl)'; '2 Desempate' = 'Bloqueio Sonoro'; '3 Desempate' = 'Peso'},
-        [PSCustomObject]@{'Criterio Primario' = 'Classe (Cl)'; '1 Desempate' = 'Durabilidade'; '2 Desempate' = 'Bloqueio Sonoro'; '3 Desempate' = 'Peso'},
-        [PSCustomObject]@{'Criterio Primario' = 'Cl Max Masc'; '1 Desempate' = 'Classe (Cl)'; '2 Desempate' = 'Durabilidade'; '3 Desempate' = 'Bloqueio Sonoro'},
-        [PSCustomObject]@{'Criterio Primario' = 'Material'; '1 Desempate' = 'Classe (Cl)'; '2 Desempate' = 'Durabilidade'; '3 Desempate' = 'Bloqueio Sonoro'},
+        [PSCustomObject]@{'Criterio Primario' = 'Classe de Blindagem'; '1 Desempate' = 'Durabilidade'; '2 Desempate' = 'Bloqueio Sonoro'; '3 Desempate' = 'Peso'},
         [PSCustomObject]@{'Criterio Primario' = 'Bloqueio Sonoro'; '1 Desempate' = 'Classe (Cl)'; '2 Desempate' = 'Durabilidade'; '3 Desempate' = 'Peso'},
-        [PSCustomObject]@{'Criterio Primario' = 'Velocidade (Vel.M)'; '1 Desempate' = 'Classe (Cl)'; '2 Desempate' = 'Bloqueio Sonoro'; '3 Desempate' = 'Peso'},
+        [PSCustomObject]@{'Criterio Primario' = 'Penalidade de movimento'; '1 Desempate' = 'Classe (Cl)'; '2 Desempate' = 'Bloqueio Sonoro'; '3 Desempate' = 'Peso'},
         [PSCustomObject]@{'Criterio Primario' = 'Ergonomia'; '1 Desempate' = 'Classe (Cl)'; '2 Desempate' = 'Bloqueio Sonoro'; '3 Desempate' = 'Peso'},
         [PSCustomObject]@{'Criterio Primario' = 'Area Protegida'; '1 Desempate' = 'Classe (Cl)'; '2 Desempate' = 'Bloqueio Sonoro'; '3 Desempate' = 'Durabilidade'},
-        [PSCustomObject]@{'Criterio Primario' = 'Ricochete (Ricoch)'; '1 Desempate' = 'Classe (Cl)'; '2 Desempate' = 'Bloqueio Sonoro'; '3 Desempate' = 'Durabilidade'},
-        [PSCustomObject]@{'Criterio Primario' = 'Captador de Som'; '1 Desempate' = 'Classe (Cl)'; '2 Desempate' = 'Durabilidade'; '3 Desempate' = 'Bloqueio Sonoro'},
-        [PSCustomObject]@{'Criterio Primario' = 'Reducao de Ruido'; '1 Desempate' = 'Classe (Cl)'; '2 Desempate' = 'Durabilidade'; '3 Desempate' = 'Bloqueio Sonoro'},
-        [PSCustomObject]@{'Criterio Primario' = 'Acessorio'; '1 Desempate' = 'Classe (Cl)'; '2 Desempate' = 'Durabilidade'; '3 Desempate' = 'Bloqueio Sonoro'}
+        [PSCustomObject]@{'Criterio Primario' = 'Chance de Ricochete'; '1 Desempate' = 'Classe (Cl)'; '2 Desempate' = 'Bloqueio Sonoro'; '3 Desempate' = 'Durabilidade'},
+        [PSCustomObject]@{'Criterio Primario' = 'Captura de som'; '1 Desempate' = 'Classe (Cl)'; '2 Desempate' = 'Durabilidade'; '3 Desempate' = 'Bloqueio Sonoro'},
+        [PSCustomObject]@{'Criterio Primario' = 'Reducao de ruido'; '1 Desempate' = 'Classe (Cl)'; '2 Desempate' = 'Durabilidade'; '3 Desempate' = 'Bloqueio Sonoro'},
+        [PSCustomObject]@{'Criterio Primario' = 'Acessorio'; '1 Desempate' = 'Classe (Cl)'; '2 Desempate' = 'Durabilidade'; '3 Desempate' = 'Bloqueio Sonoro'},
+        [PSCustomObject]@{'Criterio Primario' = 'Classe maxima da mascara compativel'; '1 Desempate' = 'Classe (Cl)'; '2 Desempate' = 'Durabilidade'; '3 Desempate' = 'Bloqueio Sonoro'}
     )
-    Show-HelpCriteriaTemplate -Title "Como Funcionam os Criterios (Busca de Capacetes)" -HelpData $helpData
+    Show-HelpCriteriaTemplate -Title "Como Funcionam os Criterios (Busca de Capacetes)" -HelpData $helpData -WideHeader
 }
 
 function Show-BodyArmorHelpCriteria {
     $helpData = @(
         [PSCustomObject]@{'Criterio Primario' = 'Peso'; '1 Desempate' = 'Classe (Cl)'; '2 Desempate' = 'Durabilidade'; '3 Desempate' = 'Velocidade (Vel.M)'},
         [PSCustomObject]@{'Criterio Primario' = 'Durabilidade'; '1 Desempate' = 'Classe (Cl)'; '2 Desempate' = 'Peso'; '3 Desempate' = 'Velocidade (Vel.M)'},
-        [PSCustomObject]@{'Criterio Primario' = 'Classe (Cl)'; '1 Desempate' = 'Durabilidade'; '2 Desempate' = 'Peso'; '3 Desempate' = 'Velocidade (Vel.M)'},
-        [PSCustomObject]@{'Criterio Primario' = 'Material'; '1 Desempate' = 'Classe (Cl)'; '2 Desempate' = 'Durabilidade'; '3 Desempate' = 'Peso'},
-        [PSCustomObject]@{'Criterio Primario' = 'Velocidade (Vel.M)'; '1 Desempate' = 'Classe (Cl)'; '2 Desempate' = 'Durabilidade'; '3 Desempate' = 'Peso'},
+        [PSCustomObject]@{'Criterio Primario' = 'Classe de Blindagem'; '1 Desempate' = 'Durabilidade'; '2 Desempate' = 'Peso'; '3 Desempate' = 'Velocidade (Vel.M)'},
+        [PSCustomObject]@{'Criterio Primario' = 'Penalidade de movimento'; '1 Desempate' = 'Classe (Cl)'; '2 Desempate' = 'Durabilidade'; '3 Desempate' = 'Peso'},
         [PSCustomObject]@{'Criterio Primario' = 'Ergonomia'; '1 Desempate' = 'Classe (Cl)'; '2 Desempate' = 'Durabilidade'; '3 Desempate' = 'Peso'},
         [PSCustomObject]@{'Criterio Primario' = 'Area Protegida'; '1 Desempate' = 'Classe (Cl)'; '2 Desempate' = 'Durabilidade'; '3 Desempate' = 'Peso'}
     )
@@ -2076,22 +2086,21 @@ function Show-ArmoredRigHelpCriteria {
     $helpData = @(
         [PSCustomObject]@{'Criterio Primario' = 'Peso'; '1 Desempate' = 'Classe (Cl)'; '2 Desempate' = 'Durabilidade'; '3 Desempate' = '-'},
         [PSCustomObject]@{'Criterio Primario' = 'Durabilidade'; '1 Desempate' = 'Classe (Cl)'; '2 Desempate' = 'Peso'; '3 Desempate' = '-'},
-        [PSCustomObject]@{'Criterio Primario' = 'Classe (Cl)'; '1 Desempate' = 'Durabilidade'; '2 Desempate' = 'Peso'; '3 Desempate' = '-'},
-        [PSCustomObject]@{'Criterio Primario' = 'Material'; '1 Desempate' = 'Classe (Cl)'; '2 Desempate' = 'Durabilidade'; '3 Desempate' = 'Peso'},
-        [PSCustomObject]@{'Criterio Primario' = 'Velocidade (Vel.M)'; '1 Desempate' = 'Classe (Cl)'; '2 Desempate' = '-'; '3 Desempate' = '-'},
+        [PSCustomObject]@{'Criterio Primario' = 'Classe de Blindagem'; '1 Desempate' = 'Durabilidade'; '2 Desempate' = 'Peso'; '3 Desempate' = '-'},
+        [PSCustomObject]@{'Criterio Primario' = 'Penalidade de movimento'; '1 Desempate' = 'Classe (Cl)'; '2 Desempate' = '-'; '3 Desempate' = '-'},
         [PSCustomObject]@{'Criterio Primario' = 'Ergonomia'; '1 Desempate' = 'Classe (Cl)'; '2 Desempate' = 'Durabilidade'; '3 Desempate' = 'Peso'},
-        [PSCustomObject]@{'Criterio Primario' = 'Armazenamento'; '1 Desempate' = 'Classe (Cl)'; '2 Desempate' = 'Durabilidade'; '3 Desempate' = 'Peso'},
-        [PSCustomObject]@{'Criterio Primario' = 'Area Protegida'; '1 Desempate' = 'Classe (Cl)'; '2 Desempate' = 'Durabilidade'; '3 Desempate' = 'Peso'}
+        [PSCustomObject]@{'Criterio Primario' = 'Armazenamento'; '1 Desempate' = 'Conj. Blocos (Maior)'; '2 Desempate' = 'Classe (Cl)'; '3 Desempate' = 'Durabilidade'},
+        [PSCustomObject]@{'Criterio Primario' = 'Area Protegida'; '1 Desempate' = 'Classe (Cl)'; '2 Desempate' = 'Durabilidade'; '3 Desempate' = 'Peso'},
+        [PSCustomObject]@{'Criterio Primario' = 'Conjunto de blocos (HxV)'; '1 Desempate' = 'Classe (Cl)'; '2 Desempate' = 'Durabilidade'; '3 Desempate' = '-'}
     )
-    Show-HelpCriteriaTemplate -Title "Como Funcionam os Criterios (Busca de Coletes Blindados)" -HelpData $helpData
+    Show-HelpCriteriaTemplate -Title "Como Funcionam os Criterios (Busca de Coletes Blindados)" -HelpData $helpData -WideHeader
 }
 
 function Show-MaskHelpCriteria {
     $helpData = @(
         [PSCustomObject]@{'Criterio Primario' = 'Peso'; '1 Desempate' = 'Classe (Cl)'; '2 Desempate' = 'Durabilidade'; '3 Desempate' = 'Chance de Ricochete'},
         [PSCustomObject]@{'Criterio Primario' = 'Durabilidade'; '1 Desempate' = 'Classe (Cl)'; '2 Desempate' = 'Peso'; '3 Desempate' = 'Chance de Ricochete'},
-        [PSCustomObject]@{'Criterio Primario' = 'Classe (Cl)'; '1 Desempate' = 'Durabilidade'; '2 Desempate' = 'Peso'; '3 Desempate' = 'Chance de Ricochete'},
-        [PSCustomObject]@{'Criterio Primario' = 'Material'; '1 Desempate' = 'Classe (Cl)'; '2 Desempate' = 'Durabilidade'; '3 Desempate' = 'Peso'},
+        [PSCustomObject]@{'Criterio Primario' = 'Classe de Blindagem'; '1 Desempate' = 'Durabilidade'; '2 Desempate' = 'Peso'; '3 Desempate' = 'Chance de Ricochete'},
         [PSCustomObject]@{'Criterio Primario' = 'Chance de Ricochete'; '1 Desempate' = 'Classe (Cl)'; '2 Desempate' = 'Durabilidade'; '3 Desempate' = 'Peso'}
     )
     Show-HelpCriteriaTemplate -Title "Como Funcionam os Criterios (Busca de Mascaras)" -HelpData $helpData
@@ -2117,21 +2126,21 @@ function Show-HeadsetHelpCriteria {
 
 function Show-UnarmoredRigHelpCriteria {
     $helpData = @(
-        [PSCustomObject]@{'Criterio Primario' = 'Peso'; '1 Desempate' = 'Espaco'; '2 Desempate' = '-'; '3 Desempate' = '-'},
-        [PSCustomObject]@{'Criterio Primario' = 'Espaco'; '1 Desempate' = 'Peso'; '2 Desempate' = '-'; '3 Desempate' = '-'},
-        [PSCustomObject]@{'Criterio Primario' = '+Espaco p/armaz -Espaco consumido'; '1 Desempate' = 'Espaco'; '2 Desempate' = 'Peso'; '3 Desempate' = '-'}
+        [PSCustomObject]@{'Criterio Primario' = 'Peso'; '1 Desempate' = 'Armazenamento'; '2 Desempate' = '-'; '3 Desempate' = '-'},
+        [PSCustomObject]@{'Criterio Primario' = 'Armazenamento'; '1 Desempate' = 'Conj. Blocos (Maior)'; '2 Desempate' = '+Armaz -Espaco'; '3 Desempate' = 'Peso'},
+        [PSCustomObject]@{'Criterio Primario' = 'Conjunto de blocos (HxV)'; '1 Desempate' = 'Armazenamento'; '2 Desempate' = '-'; '3 Desempate' = '-'},
+        [PSCustomObject]@{'Criterio Primario' = '+Espaco p/armaz -Espaco consumido'; '1 Desempate' = 'Armazenamento'; '2 Desempate' = 'Qtd. Conjuntos (Menor)'; '3 Desempate' = 'Peso'}
     )
-    # Requer um cabeçalho maior para o nome do critério
     Show-HelpCriteriaTemplate -Title "Como Funcionam os Criterios (Busca de Coletes Nao Blindados)" -HelpData $helpData -WideHeader
 }
 
 function Show-BackpackHelpCriteria {
     $helpData = @(
-        [PSCustomObject]@{'Criterio Primario' = 'Peso'; '1 Desempate' = 'Espaco'; '2 Desempate' = '-'; '3 Desempate' = '-'},
-        [PSCustomObject]@{'Criterio Primario' = 'Espaco'; '1 Desempate' = 'Peso'; '2 Desempate' = '-'; '3 Desempate' = '-'},
-        [PSCustomObject]@{'Criterio Primario' = '+Espaco p/armaz -Espaco consumido'; '1 Desempate' = 'Espaco'; '2 Desempate' = 'Peso'; '3 Desempate' = '-'}
+        [PSCustomObject]@{'Criterio Primario' = 'Peso'; '1 Desempate' = 'Armazenamento'; '2 Desempate' = '-'; '3 Desempate' = '-'},
+        [PSCustomObject]@{'Criterio Primario' = 'Armazenamento'; '1 Desempate' = 'Conj. Blocos (Maior)'; '2 Desempate' = 'Tam. Desdobrado (Menor)'; '3 Desempate' = '+Armaz -Espaco'},
+        [PSCustomObject]@{'Criterio Primario' = 'Conjunto de blocos (HxV)'; '1 Desempate' = 'Armazenamento'; '2 Desempate' = '-'; '3 Desempate' = '-'},
+        [PSCustomObject]@{'Criterio Primario' = '+Espaco p/armaz -Espaco consumido'; '1 Desempate' = 'Armazenamento'; '2 Desempate' = 'Qtd. Conjuntos (Menor)'; '3 Desempate' = 'Peso'}
     )
-    # Requer um cabeçalho maior para o nome do critério
     Show-HelpCriteriaTemplate -Title "Como Funcionam os Criterios (Busca de Mochilas)" -HelpData $helpData -WideHeader
 }
 
@@ -2468,7 +2477,19 @@ function Search-WithFilters {
         }
     }
 
-    $criterios = @("Alfabetico", "Dano Base", "Nivel de penetracao", "Chance de Ferir", "Velocidade inicial", "Precisao", "Penetracao", "Dano de blindagem", "Controle de recuo vertical", "Controle de recuo horizontal")
+    # --- LISTA REORDENADA CONFORME SOLICITADO ---
+    $criterios = @(
+        "Alfabetico", 
+        "Nivel de penetracao", 
+        "Penetracao", 
+        "Dano Base", 
+        "Dano de blindagem", 
+        "Velocidade inicial", 
+        "Precisao", 
+        "Controle de recuo vertical", 
+        "Controle de recuo horizontal", 
+        "Chance de Ferir"
+    )
     
     $originalCursorSize = (Get-Host).UI.RawUI.CursorSize; (Get-Host).UI.RawUI.CursorSize = 0
     do {
@@ -2500,10 +2521,16 @@ function Search-WithFilters {
                     
                     $classesCompativeis = if ($caliberToClassesMap.ContainsKey($calibre)) { $caliberToClassesMap[$calibre] | ForEach-Object { $global:WeaponClassToPortugueseMap[$_] } } else { @("Desconhecida") }
                     
+                    $rvNum = [int]$content[6]
+                    $rhNum = [int]$content[7]
+
                     $ammoData += [PSCustomObject]@{ 
                         Nome = $file.BaseName; Lv = [int]$content[0]; Penetracao = $content[1]; PenetracaoNum = [int]$content[1]
                         DanoBase = $content[2]; DanoBaseNum = if ($content[2] -match '\((\d+)\)') { [int]$Matches[1] } else { [int]($content[2] -replace '[^\d]', '') }
-                        DanoArmadura = $content[3]; Velocidade = [int]$content[4]; Precisao = $content[5]; RecuoVert = $content[6]; RecuoHoriz = $content[7]
+                        DanoArmadura = $content[3]; DanoArmaduraNum = [int]$content[3]
+                        Velocidade = [int]$content[4]; Precisao = $content[5]; PrecisaoNum = [int]$content[5]
+                        RecuoVert = $content[6]; RecuoVertNum = $rvNum
+                        RecuoHoriz = $content[7]; RecuoHorizNum = $rhNum
                         ChanceFerir = $chanceRaw; ChanceFerirDisplay = $chanceDisplay; ChanceFerirNum = $chanceNum; Calibre = $calibre; ClassesList = $classesCompativeis
                     }
                 }
@@ -2572,7 +2599,7 @@ function Search-WithFilters {
         Write-Host " " -NoNewline; if ($global:criterioOrdenacao -eq "Controle de recuo horizontal") { Write-Host ("{0,-3}" -f "CRH") -ForegroundColor Green -NoNewline } else { Write-Host ("{0,-3}" -f "CRH") -NoNewline }
         Write-Host " " -NoNewline; if ($global:criterioOrdenacao -eq "Chance de Ferir") { Write-Host ("{0,-12}" -f "Chance Ferir") -ForegroundColor Green -NoNewline } else { Write-Host ("{0,-12}" -f "Chance Ferir") -NoNewline }
         Write-Host "  " -NoNewline; Write-Host ("{0,-9}" -f "Calibre")
-        Write-Host "-------------------   -- --- -------------- ------------ -------- ---- --- --- ------------  ---------"
+        Write-Host "-------------------   -- --- -------------  ------------ -------- ---- --- --- ------------  ---------"
         
         foreach ($item in $sortedData) {
             Write-Host ("{0,-19}" -f $item.Nome) -NoNewline -ForegroundColor $(if ($global:criterioOrdenacao -eq "Alfabetico") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
@@ -2648,26 +2675,127 @@ function Search-WithFilters {
     } while ($true)
 }
 
+function Ordenar-WeaponData {
+    param ($dados, $criterio, $ordem)
+    
+    $poderFogoMap = @{ "Low" = 1; "Mid-Low" = 2; "Medium" = 3; "Mid-High" = 4; "High" = 5 }
+    $canoMap = @{ "D+ R+" = 7; "R+" = 6; "Default +" = 5; "FB D+" = 4; "FB" = 2; "Custom" = 2; "FB D-" = 1 }
+    
+    $modoMap = @{
+        "Pump-Action" = 1
+        "Bolt-Action" = 1
+        "3-RB" = 2
+        "Semi" = 3
+        "Semi, 3-RB" = 3
+        "Full" = 4
+        "Semi, Full" = 4
+        "2-RB, Semi, Full" = 4
+        "3-RB, Semi, Full" = 4
+    }
+
+    foreach ($item in $dados) {
+        $item | Add-Member -MemberType NoteProperty -Name 'PoderFogoNum' -Value $poderFogoMap[$item.PoderFogo] -ErrorAction SilentlyContinue -Force
+        $item | Add-Member -MemberType NoteProperty -Name 'CanoNum' -Value $canoMap[$item.Cano] -ErrorAction SilentlyContinue -Force
+        
+        $valModo = if ($modoMap.ContainsKey($item.ModoDisparo)) { $modoMap[$item.ModoDisparo] } else { 0 }
+        $item | Add-Member -MemberType NoteProperty -Name 'ModoDisparoNum' -Value $valModo -ErrorAction SilentlyContinue -Force
+    }
+
+    $propriedadePrimaria = switch ($criterio) {
+        "Alfabetico"                   { "Nome" }
+        "Controle de recuo vertical"   { "VerticalRecoil" }
+        "Controle de recuo horizontal" { "HorizontalRecoil" }
+        "Ergonomia"                    { "Ergonomia" }
+        "Estabilidade de arma"         { "EstabilidadeArma" }
+        "Precisao"                     { "Precisao" }
+        "Estabilidade sem mirar"       { "Estabilidade" }
+        "Distancia Efetiva"            { "Alcance" }
+        "Velocidade de Saida"          { "Velocidade" }
+        "Modo de disparo"              { "ModoDisparoNum" }
+        "Cadencia"                     { "Cadencia" }
+        "Poder de fogo"                { "PoderFogoNum" }
+        "Melhoria de cano"             { "CanoNum" }
+    }
+    
+    $isDescending = ($ordem -eq "Decrescente")
+    
+    $ordenacaoParams = @( @{ Expression = { $_."$propriedadePrimaria" }; Descending = $isDescending } )
+    
+    switch ($criterio) {
+        "Controle de recuo vertical" { 
+            $ordenacaoParams += @{ Expression = 'Precisao'; Descending = $isDescending }
+            $ordenacaoParams += @{ Expression = 'HorizontalRecoil'; Descending = $isDescending }
+            $ordenacaoParams += @{ Expression = 'Cadencia'; Descending = $isDescending }
+        }
+        "Controle de recuo horizontal" { 
+            $ordenacaoParams += @{ Expression = 'Precisao'; Descending = $isDescending }
+            $ordenacaoParams += @{ Expression = 'VerticalRecoil'; Descending = $isDescending }
+            $ordenacaoParams += @{ Expression = 'Cadencia'; Descending = $isDescending }
+        }
+        "Ergonomia"         { 
+            $ordenacaoParams += @{ Expression = 'Precisao'; Descending = $isDescending }
+            $ordenacaoParams += @{ Expression = 'Cadencia'; Descending = $isDescending }
+        }
+        "Estabilidade de arma" {
+            $ordenacaoParams += @{ Expression = 'Precisao'; Descending = $isDescending }
+            $ordenacaoParams += @{ Expression = 'HorizontalRecoil'; Descending = $isDescending }
+            $ordenacaoParams += @{ Expression = 'Cadencia'; Descending = $isDescending }
+        }
+        "Precisao"         {
+            $ordenacaoParams += @{ Expression = 'Cadencia'; Descending = $isDescending }
+            $ordenacaoParams += @{ Expression = 'HorizontalRecoil'; Descending = $isDescending }
+        }
+        "Estabilidade sem mirar" {
+            $ordenacaoParams += @{ Expression = 'Precisao'; Descending = $isDescending }
+            $ordenacaoParams += @{ Expression = 'Cadencia'; Descending = $isDescending }
+        }
+        "Distancia Efetiva" {
+            $ordenacaoParams += @{ Expression = 'Velocidade'; Descending = $isDescending }
+            $ordenacaoParams += @{ Expression = 'Cadencia'; Descending = $isDescending }
+            $ordenacaoParams += @{ Expression = 'HorizontalRecoil'; Descending = $isDescending }
+        }
+        "Velocidade de Saida" { $ordenacaoParams += @{ Expression = 'Alcance'; Descending = $isDescending } }
+        
+        "Modo de disparo"  { 
+            $ordenacaoParams += @{ Expression = 'PoderFogoNum'; Descending = $isDescending } 
+            $ordenacaoParams += @{ Expression = 'Cadencia'; Descending = $isDescending }
+            $ordenacaoParams += @{ Expression = 'Alcance'; Descending = $isDescending }
+            $ordenacaoParams += @{ Expression = 'HorizontalRecoil'; Descending = $isDescending }
+        }
+        
+        "Cadencia"          { $ordenacaoParams += @{ Expression = 'PoderFogoNum'; Descending = $isDescending } }
+        "Poder de fogo"    { 
+            $ordenacaoParams += @{ Expression = 'Velocidade'; Descending = $isDescending } 
+            $ordenacaoParams += @{ Expression = 'Cadencia'; Descending = $isDescending }
+        }
+        "Melhoria de cano"    { 
+            $ordenacaoParams += @{ Expression = 'PoderFogoNum'; Descending = $isDescending }
+            $ordenacaoParams += @{ Expression = 'Alcance'; Descending = $isDescending }
+            $ordenacaoParams += @{ Expression = 'Cadencia'; Descending = $isDescending }
+            $ordenacaoParams += @{ Expression = 'HorizontalRecoil'; Descending = $isDescending }
+        }
+    }
+    
+    $dados | Sort-Object -Property $ordenacaoParams
+}
+
 function Search-WeaponsWithFilters {
     $originalCursorSize = (Get-Host).UI.RawUI.CursorSize
     (Get-Host).UI.RawUI.CursorSize = 0
     $criterioOrdenacao = "Alfabetico"
     $ordemAtual = "Crescente"
     
-    # Inicializa o estado do filtro se não existir
     if (-not $script:weaponFilters) {
         $script:weaponFilters = @{ SelectedValues = @{}; SelectionMethod = @{} }
     }
 
-    $criterios = @("Alfabetico", "Calibre", "Controle de recuo vertical", "Controle de recuo horizontal", "Ergonomia", "Estabilidade de arma", "Precisao", "Estabilidade sem mirar", "Distancia Efetiva", "Velocidade de Saida", "Modo de disparo", "Cadencia", "Poder de fogo", "Melhoria de cano")
+    $criterios = @("Alfabetico", "Controle de recuo vertical", "Controle de recuo horizontal", "Ergonomia", "Estabilidade de arma", "Precisao", "Estabilidade sem mirar", "Distancia Efetiva", "Velocidade de Saida", "Modo de disparo", "Cadencia", "Poder de fogo", "Melhoria de cano")
     
-    # Mapas de tradução para o filtro ficar bonito
     $poderFogoMapDisplay = @{ "Low"="Baixo";"Mid-Low"="Medio-Baixo";"Medium"="Medio";"Mid-High"="Medio-Alto";"High"="Alto" }
     $canoMapDisplay = @{ "Default +"="Padrao +";"FB"="CF";"R+"="A+";"FB D+"="CF D+";"FB D-"="CF D-";"D+ R+"="D+ A+";"Custom"="Custom" }
 
     do {
         $weaponData = @()
-        # Pega todas as armas
         $weaponDataFiles = Get-ChildItem -Path $weaponsPath -Filter "*.txt" -File
         
         foreach ($file in $weaponDataFiles) {
@@ -2676,7 +2804,6 @@ function Search-WeaponsWithFilters {
                 $estabilidadeArmaValue = 0
                 if ($content.Count -ge 14) { $estabilidadeArmaValue = [int]$content[13] }
                 
-                # Prepara valores de exibição para o filtro
                 $classePT = $global:WeaponClassToPortugueseMap[$content[0]]
                 $modoDisparoDisplay = $content[9].Replace('Bolt-Action', 'A.Ferrolho').Replace('Pump-Action', 'A.Bombeamento').Replace('Full', 'Auto')
                 $poderDisplay = if ($poderFogoMapDisplay.ContainsKey($content[11])) { $poderFogoMapDisplay[$content[11]] } else { $content[11] }
@@ -2685,7 +2812,7 @@ function Search-WeaponsWithFilters {
                 $weaponData += [PSCustomObject]@{
                     Nome             = $file.BaseName
                     Classe           = $content[0]
-                    ClasseDisplay    = $classePT # Propriedade para o Filtro
+                    ClasseDisplay    = $classePT
                     Calibre          = $content[1]
                     VerticalRecoil   = [int]$content[2]
                     HorizontalRecoil = [int]$content[3]
@@ -2696,17 +2823,16 @@ function Search-WeaponsWithFilters {
                     Alcance          = [int]$content[7]
                     Velocidade       = [int]$content[8]
                     ModoDisparo      = $content[9]
-                    ModoDisparoDisplay = $modoDisparoDisplay # Propriedade para o Filtro
+                    ModoDisparoDisplay = $modoDisparoDisplay
                     Cadencia         = [int]$content[10]
                     PoderFogo        = $content[11]
-                    PoderFogoDisplay = $poderDisplay # Propriedade para o Filtro
+                    PoderFogoDisplay = $poderDisplay
                     Cano             = $content[12]
-                    CanoDisplay      = $canoDisplay # Propriedade para o Filtro
+                    CanoDisplay      = $canoDisplay
                 }
             }
         }
         
-        # Aplica o Filtro Avançado (Ocultar armas)
         $filteredData = $weaponData
         $isAdvancedFilterActive = $false
         if ($script:weaponFilters.SelectedValues.Keys.Count -gt 0) {
@@ -2714,7 +2840,6 @@ function Search-WeaponsWithFilters {
             foreach($key in $script:weaponFilters.SelectedValues.Keys){
                 $valuesToHide = $script:weaponFilters.SelectedValues[$key]
                 if($valuesToHide -and $valuesToHide.Count -gt 0){
-                    # Filtra removendo itens que tenham o valor na lista de ocultos
                     $filteredData = $filteredData | Where-Object { $_.$key -notin $valuesToHide }
                 }
             }
@@ -2725,21 +2850,18 @@ function Search-WeaponsWithFilters {
         Clear-Host
         Write-Host "=== Busca de armas com filtro ==="; Write-Host
         
-        # Linha 1 de botões
         Write-Host "Botoes: " -NoNewline
         Write-Host "F1" -ForegroundColor Cyan -NoNewline; Write-Host " - Mudar Criterio ($criterioOrdenacao) | " -NoNewline
         Write-Host "F2" -ForegroundColor Yellow -NoNewline; Write-Host " - Mudar Ordem ($ordemAtual)"
         
-        # Linha 2 de botões (Novos botões)
         $statusF3 = if ($isAdvancedFilterActive) { "(Ligado)" } else { "(Desligado)" }
         Write-Host "Botoes: " -NoNewline
         Write-Host "F3" -ForegroundColor $(if ($isAdvancedFilterActive) {'Magenta'} else {'DarkGray'}) -NoNewline; Write-Host " - Ocultar armas $statusF3 | " -NoNewline
         Write-Host "F4" -ForegroundColor Yellow -NoNewline; Write-Host " - Ver legenda | " -NoNewline
         Write-Host "F5" -ForegroundColor Red -NoNewline; Write-Host " - Voltar ao menu"; Write-Host
 
-        # Cabeçalho da Tabela
         if ($criterioOrdenacao -eq "Alfabetico") { Write-Host ("{0,-17}" -f "Nome da Arma") -ForegroundColor Green -NoNewline } else { Write-Host ("{0,-17}" -f "Nome da Arma") -NoNewline }
-        Write-Host " " -NoNewline; if ($criterioOrdenacao -eq "Calibre") { Write-Host ("{0,-12}" -f "Calibre") -ForegroundColor Green -NoNewline } else { Write-Host ("{0,-12}" -f "Calibre") -NoNewline }
+        Write-Host " " -NoNewline; Write-Host ("{0,-12}" -f "Calibre") -NoNewline
         Write-Host " " -NoNewline; if ($criterioOrdenacao -eq "Controle de recuo vertical") { Write-Host ("{0,-4}" -f "CRV") -ForegroundColor Green -NoNewline } else { Write-Host ("{0,-4}" -f "CRV") -NoNewline }
         Write-Host " " -NoNewline; if ($criterioOrdenacao -eq "Controle de recuo horizontal") { Write-Host ("{0,-4}" -f "CRH") -ForegroundColor Green -NoNewline } else { Write-Host ("{0,-4}" -f "CRH") -NoNewline }
         Write-Host " " -NoNewline; if ($criterioOrdenacao -eq "Ergonomia") { Write-Host ("{0,-4}" -f "Ergo") -ForegroundColor Green -NoNewline } else { Write-Host ("{0,-4}" -f "Ergo") -NoNewline }
@@ -2753,12 +2875,11 @@ function Search-WeaponsWithFilters {
         Write-Host " " -NoNewline; if ($criterioOrdenacao -eq "Poder de fogo") { Write-Host ("{0,-11}" -f "Poder.DFG") -ForegroundColor Green -NoNewline } else { Write-Host ("{0,-11}" -f "Poder.DFG") -NoNewline }
         Write-Host " " -NoNewline; if ($criterioOrdenacao -eq "Melhoria de cano") { Write-Host ("{0,-9}" -f "Melh.Cano") -ForegroundColor Green } else { Write-Host ("{0,-9}" -f "Melh.Cano") }
         
-        Write-Host "----------------- ------------ ---- ---- ---- ------- ---- ------- ------ ------- ----------------- ---   ----------- ---------"
+        Write-Host "----------------  -----------  ---  ---  ---- ------- ---- ------- ------ ------  ----------------  ---   ----------  ---------"
         
-        # Loop de Exibição dos Dados
         foreach ($item in $sortedData) {
             Write-Host ("{0,-17}" -f $item.Nome) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Alfabetico") { 'Green' } else { $Host.UI.RawUI.ForegroundColor }); Write-Host " " -NoNewline
-            Write-Host ("{0,-12}" -f $item.Calibre) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Calibre") { 'Green' } else { $Host.UI.RawUI.ForegroundColor }); Write-Host " " -NoNewline
+            Write-Host ("{0,-12}" -f $item.Calibre) -NoNewline; Write-Host " " -NoNewline
             Write-Host ("{0,-4}" -f $item.VerticalRecoil) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Controle de recuo vertical") { 'Green' } else { $Host.UI.RawUI.ForegroundColor }); Write-Host " " -NoNewline
             Write-Host ("{0,-4}" -f $item.HorizontalRecoil) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Controle de recuo horizontal") { 'Green' } else { $Host.UI.RawUI.ForegroundColor }); Write-Host " " -NoNewline
             Write-Host ("{0,-4}" -f $item.Ergonomia) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Ergonomia") { 'Green' } else { $Host.UI.RawUI.ForegroundColor }); Write-Host " " -NoNewline
@@ -2775,18 +2896,17 @@ function Search-WeaponsWithFilters {
         
         $key = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
         switch ($key.VirtualKeyCode) {
-            112 { # F1
+            112 {
                 (Get-Host).UI.RawUI.CursorSize = $originalCursorSize; $novoCriterio = Show-Menu -Title "Selecione o criterio" -Options $criterios -FlickerFree; (Get-Host).UI.RawUI.CursorSize = 0; if ($novoCriterio) { $criterioOrdenacao = $novoCriterio }
             }
-            113 { # F2
+            113 {
                 $ordemAtual = if ($ordemAtual -eq "Decrescente") { "Crescente" } else { "Decrescente" } 
             }
-            114 { # F3 - Ocultar Armas (Novo)
-                # Definição das colunas com espaçamento e nomes CORRIGIDOS
+            114 {
                 $filterDefs = @(
                     @{ Label = "Categoria";        Property = "ClasseDisplay";      Width = 27 },
                     @{ Label = "Calibre";          Property = "Calibre";            Width = 18 },
-                    @{ Label = "Modo de disparo";  Property = "ModoDisparoDisplay"; Width = 24 },
+                    @{ Label = "Modo de disparo";  Property = "ModoDisparoDisplay"; Width = 24; CustomSortOrder = @("A.Bombeamento", "A.Ferrolho", "3-RB", "Semi", "Semi, 3-RB", "Auto", "Semi, Auto", "2-RB, Semi, Auto", "3-RB, Semi, Auto") },
                     @{ Label = "Poder de fogo";    Property = "PoderFogoDisplay";   Width = 20; CustomSortOrder = @("Baixo", "Medio-Baixo", "Medio", "Medio-Alto", "Alto") },
                     @{ Label = "Melhoria de Cano"; Property = "CanoDisplay";        Width = 22; CustomSortOrder = @("CF D-", "Custom", "CF", "CF D+", "Padrao +", "A+", "D+", "D+ A+") }
                 )
@@ -2795,17 +2915,498 @@ function Search-WeaponsWithFilters {
                 if ($updatedFilters) {
                     $script:weaponFilters = $updatedFilters
                 } else { 
-                    # Se cancelar (F2), limpa os filtros
                     $script:weaponFilters = @{ SelectedValues = @{}; SelectionMethod = @{} }
                 }
                 (Get-Host).UI.RawUI.CursorSize = 0
             }
-            115 { # F4 - Ver Legenda (Antigo F5)
+            115 {
                 Show-WeaponLegend; continue 
             }
-            116 { # F5 - Voltar (Antigo F6)
-                $script:weaponFilters = @{ SelectedValues = @{}; SelectionMethod = @{} } # Limpa filtro ao sair
+            116 {
+                $script:weaponFilters = @{ SelectedValues = @{}; SelectionMethod = @{} }
                 (Get-Host).UI.RawUI.CursorSize = $originalCursorSize; return 
+            }
+        }
+    } while ($true)
+}
+
+function Show-AdvancedFilterScreen {
+    param(
+        [array]$WeaponItems,
+        [array]$AmmoItems,
+        [hashtable]$CurrentFilters
+    )
+    
+    $originalCursorSize = (Get-Host).UI.RawUI.CursorSize; (Get-Host).UI.RawUI.CursorSize = 0
+    
+    $tempFilters = @{
+        SelectedValues = if ($CurrentFilters.SelectedValues) { $CurrentFilters.SelectedValues.Clone() } else { @{} }
+        SelectionMethod = if ($CurrentFilters.SelectionMethod) { $CurrentFilters.SelectionMethod.Clone() } else { @{} }
+    }
+
+    $availableMap = @{}
+
+    $sortOrders = @{
+        "PoderFogoDisplay"   = @("Baixo", "Medio-Baixo", "Medio", "Medio-Alto", "Alto")
+        "CanoDisplay"        = @("CF D-", "Custom", "CF", "CF D+", "Padrao +", "A+", "D+", "D+ A+")
+        "Wound"              = @("//////", "Baixo", "Medio", "Alto")
+        "ModoDisparoDisplay" = @(
+            "A.Bombeamento", 
+            "A.Ferrolho", 
+            "3-RB", 
+            "Semi", 
+            "Semi, 3-RB",
+            "Auto", 
+            "Semi, Auto", 
+            "2-RB, Semi, Auto", 
+            "3-RB, Semi, Auto"
+        )
+    }
+
+    $catValues = $WeaponItems | Select-Object -ExpandProperty ClasseDisplay -Unique | Sort-Object
+    $calValues = ($WeaponItems.Calibre + $AmmoItems.Calibre) | Select-Object -Unique | Sort-Object
+    $modValues = $WeaponItems | Select-Object -ExpandProperty ModoDisparoDisplay -Unique
+    $modValues = $sortOrders["ModoDisparoDisplay"] | Where-Object { $_ -in $modValues }
+    $podValues = $WeaponItems | Select-Object -ExpandProperty PoderFogoDisplay -Unique
+    $podValues = $sortOrders["PoderFogoDisplay"] | Where-Object { $_ -in $podValues }
+    $canValues = $WeaponItems | Select-Object -ExpandProperty CanoDisplay -Unique
+    $canValues = $sortOrders["CanoDisplay"] | Where-Object { $_ -in $canValues }
+    $levValues = $AmmoItems | Select-Object -ExpandProperty Level -Unique | Sort-Object
+    $wndValues = $AmmoItems | Select-Object -ExpandProperty Wound -Unique
+    $wndValues = $sortOrders["Wound"] | Where-Object { $_ -in $wndValues }
+
+    $columns = @(
+        @{ Label="Categoria";    Prop="ClasseDisplay";      Values=$catValues; Width=23; SelectedIndex=0; Source="Weapon" }, 
+        @{ Label="Calibre";      Prop="Calibre";            Values=$calValues; Width=15; SelectedIndex=0; Source="Both" }, 
+        @{ Label="Modo Disparo"; Prop="ModoDisparoDisplay"; Values=$modValues; Width=22; SelectedIndex=0; Source="Weapon" },
+        @{ Label="Poder Fogo";   Prop="PoderFogoDisplay";   Values=$podValues; Width=17; SelectedIndex=0; Source="Weapon" },
+        @{ Label="Melh. Cano";   Prop="CanoDisplay";        Values=$canValues; Width=14; SelectedIndex=0; Source="Weapon" },
+        @{ Label="Nivel Pen";    Prop="Level";              Values=$levValues; Width=10; SelectedIndex=0; Source="Ammo" },
+        @{ Label="Chance Ferir"; Prop="Wound";              Values=$wndValues; Width=12; SelectedIndex=0; Source="Ammo" }
+    )
+
+    $maxRows = 0
+    foreach ($c in $columns) { if ($c.Values.Count -gt $maxRows) { $maxRows = $c.Values.Count } }
+    
+    $currentColumnIndex = 0
+    
+    $UpdateAutoLogic = {
+        $wList = $WeaponItems; $aList = $AmmoItems
+
+        foreach ($prop in $tempFilters.SelectedValues.Keys) {
+            if ($prop -in "Level", "Wound") { continue }
+            $manualHidden = $tempFilters.SelectedValues[$prop] | Where-Object { $tempFilters.SelectionMethod["${prop}_$_"] -eq "Manual" }
+            if ($manualHidden) { $wList = $wList | Where-Object { $_.$prop -notin $manualHidden } }
+        }
+        foreach ($prop in $tempFilters.SelectedValues.Keys) {
+            if ($prop -notin "Level", "Wound", "Calibre") { continue }
+            $manualHidden = $tempFilters.SelectedValues[$prop] | Where-Object { $tempFilters.SelectionMethod["${prop}_$_"] -eq "Manual" }
+            if ($manualHidden) { $aList = $aList | Where-Object { $_.$prop -notin $manualHidden } }
+        }
+
+        $wCalibers = $wList.Calibre | Select-Object -Unique
+        $aCalibers = $aList.Calibre | Select-Object -Unique
+        $sharedCalibers = $wCalibers | Where-Object { $_ -in $aCalibers }
+
+        $finalWeapons = $wList | Where-Object { $_.Calibre -in $sharedCalibers }
+        $finalAmmo    = $aList | Where-Object { $_.Calibre -in $sharedCalibers }
+
+        $availableMap.Clear()
+        
+        foreach ($w in $finalWeapons) {
+            foreach ($col in $columns) {
+                if ($col.Source -eq "Weapon" -or $col.Source -eq "Both") {
+                    $p = $col.Prop; if ($null -ne $w.$p) { $availableMap["${p}_$($w.$p)"] = $true }
+                }
+            }
+        }
+        foreach ($a in $finalAmmo) {
+            foreach ($col in $columns) {
+                if ($col.Source -eq "Ammo" -or $col.Source -eq "Both") {
+                    $p = $col.Prop; if ($null -ne $a.$p) { $availableMap["${p}_$($a.$p)"] = $true }
+                }
+            }
+        }
+
+        foreach ($col in $columns) {
+            $prop = $col.Prop
+            foreach ($val in $col.Values) {
+                $keyStr = "${prop}_${val}"
+                if (-not $availableMap.ContainsKey($keyStr)) {
+                    if ($tempFilters.SelectionMethod[$keyStr] -ne "Manual") {
+                        $tempFilters.SelectionMethod[$keyStr] = "Auto"
+                        if ($val -notin $tempFilters.SelectedValues[$prop]) {
+                            if (-not $tempFilters.SelectedValues.ContainsKey($prop)) { $tempFilters.SelectedValues[$prop] = [System.Collections.ArrayList]@() }
+                            $tempFilters.SelectedValues[$prop].Add($val) | Out-Null
+                        }
+                    }
+                } else {
+                    if ($tempFilters.SelectionMethod[$keyStr] -eq "Auto") {
+                        $tempFilters.SelectionMethod.Remove($keyStr)
+                        $tempFilters.SelectedValues[$prop].Remove($val)
+                    }
+                }
+            }
+        }
+    }
+
+    & $UpdateAutoLogic
+
+    Clear-Host
+    $lastWindowWidth = [Console]::WindowWidth; $lastWindowHeight = [Console]::WindowHeight
+
+    while ($true) {
+        if ($lastWindowWidth -ne [Console]::WindowWidth -or $lastWindowHeight -ne [Console]::WindowHeight) {
+            Clear-Host; $lastWindowWidth = [Console]::WindowWidth; $lastWindowHeight = [Console]::WindowHeight
+        }
+        [Console]::SetCursorPosition(0, 0)
+
+        Write-Host "=== Filtro Avancado (Marque o que deseja OCULTAR) ===" -ForegroundColor Yellow
+        Write-Host
+        
+        $headerLine = ""; $divLine = ""
+        foreach ($col in $columns) {
+            $headerLine += ("{0,-$($col.Width)}" -f $col.Label) + " "
+            $divLine += ("-" * $col.Label.Length).PadRight($col.Width) + " "
+        }
+        Write-Host ($headerLine.PadRight([Console]::WindowWidth - 1))
+        Write-Host ($divLine.PadRight([Console]::WindowWidth - 1))
+
+        for ($i = 0; $i -lt $maxRows; $i++) {
+            for ($c = 0; $c -lt $columns.Count; $c++) {
+                $col = $columns[$c]
+                $isCursor = ($c -eq $currentColumnIndex -and $i -eq $col.SelectedIndex)
+                $bgColor = if ($isCursor) { 'DarkGray' } else { $Host.UI.RawUI.BackgroundColor }
+
+                if ($i -lt $col.Values.Count) {
+                    $val = $col.Values[$i]; $propKey = $col.Prop; $key = "${propKey}_${val}"
+                    
+                    $isAvailable = $availableMap.ContainsKey($key)
+                    $isManualSelection = $tempFilters.SelectionMethod[$key] -eq "Manual"
+                    
+                    if ($isManualSelection) {
+                        $marker = "X"
+                        if ($isCursor) { $fgColor = 'Yellow' } else { $fgColor = 'DarkYellow' }
+                    }
+                    elseif (-not $isAvailable) {
+                        $marker = "X"
+                        if ($isCursor) { $fgColor = 'White' } else { $fgColor = 'DarkGray' }
+                    }
+                    else {
+                        $marker = " "
+                        $fgColor = $Host.UI.RawUI.ForegroundColor
+                    }
+                    
+                    $prefix = if ($isCursor) { ">" } else { " " }
+                    
+                    Write-Host "$prefix [" -NoNewline -BackgroundColor $bgColor
+                    Write-Host $marker -NoNewline -BackgroundColor $bgColor -ForegroundColor $fgColor
+                    Write-Host "] " -NoNewline -BackgroundColor $bgColor
+                    
+                    $textWidth = $col.Width - 6; $displayVal = "$val"
+                    if ($displayVal.Length -gt $textWidth) { $displayVal = $displayVal.Substring(0, $textWidth) }
+                    Write-Host ("{0,-$textWidth}" -f $displayVal) -NoNewline -BackgroundColor $bgColor
+                } else {
+                    Write-Host (" " * $col.Width) -NoNewline -BackgroundColor $Host.UI.RawUI.BackgroundColor
+                }
+                Write-Host " " -NoNewline -BackgroundColor $Host.UI.RawUI.BackgroundColor
+            }
+            $padding = [Console]::WindowWidth - [Console]::CursorLeft - 1; if ($padding -gt 0) { Write-Host (" " * $padding) } else { Write-Host "" }
+        }
+
+        $currentY = [Console]::CursorTop; for($k=0; $k -lt 3; $k++) { Write-Host (" " * ([Console]::WindowWidth - 1)) }; [Console]::SetCursorPosition(0, $currentY)
+
+        Write-Host; Write-Host "[Cima/Baixo] Move | [Esq/Dir] Troca Coluna | [Enter] Marca/Desmarca"
+        Write-Host "Pressione " -NoNewline; Write-Host "F1" -ForegroundColor Blue -NoNewline; Write-Host " para Salvar e Filtrar"
+        Write-Host "Pressione " -NoNewline; Write-Host "F2" -ForegroundColor Red -NoNewline; Write-Host " para Cancelar e Voltar"
+        
+        while (-not $Host.UI.RawUI.KeyAvailable) {
+            if ($lastWindowWidth -ne [Console]::WindowWidth -or $lastWindowHeight -ne [Console]::WindowHeight) { $lastWindowWidth = [Console]::WindowWidth; $lastWindowHeight = [Console]::WindowHeight; Clear-Host; break }
+            Start-Sleep -Milliseconds 50
+        }
+        if (-not $Host.UI.RawUI.KeyAvailable) { continue }
+
+        $keyInfo = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown"); $key = $keyInfo.VirtualKeyCode
+        while ($Host.UI.RawUI.KeyAvailable) { $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown") }
+        
+        switch ($key) {
+            38 { if ($columns[$currentColumnIndex].SelectedIndex -gt 0) { $columns[$currentColumnIndex].SelectedIndex-- } }
+            40 { if ($columns[$currentColumnIndex].SelectedIndex -lt ($columns[$currentColumnIndex].Values.Count - 1)) { $columns[$currentColumnIndex].SelectedIndex++ } }
+            37 { if ($currentColumnIndex -gt 0) { $currentColumnIndex-- } }
+            39 { if ($currentColumnIndex -lt ($columns.Count - 1)) { $currentColumnIndex++ } }
+            13 { 
+                $col = $columns[$currentColumnIndex]; $val = $col.Values[$col.SelectedIndex]; $propKey = $col.Prop; $keyStr = "${propKey}_${val}"
+                
+                if ($tempFilters.SelectionMethod[$keyStr] -eq "Auto") { continue }
+
+                if (-not $tempFilters.SelectedValues.ContainsKey($propKey)) { $tempFilters.SelectedValues[$propKey] = [System.Collections.ArrayList]@() }
+                
+                if ($tempFilters.SelectionMethod[$keyStr] -eq "Manual") {
+                    $tempFilters.SelectionMethod.Remove($keyStr)
+                    $tempFilters.SelectedValues[$propKey].Remove($val)
+                } else {
+                    $tempFilters.SelectionMethod[$keyStr] = "Manual"
+                    if ($val -notin $tempFilters.SelectedValues[$propKey]) { $tempFilters.SelectedValues[$propKey].Add($val) | Out-Null }
+                }
+                
+                & $UpdateAutoLogic
+            }
+            112 { (Get-Host).UI.RawUI.CursorSize = $originalCursorSize; return $tempFilters }
+            113 { (Get-Host).UI.RawUI.CursorSize = $originalCursorSize; return $null }
+        }
+    }
+}
+
+function Search-AdvancedWithFilters {
+    $originalCursorSize = (Get-Host).UI.RawUI.CursorSize; (Get-Host).UI.RawUI.CursorSize = 0
+    
+    if (-not $script:advFilters) {
+        $script:advFilters = @{ SelectedValues = @{}; SelectionMethod = @{} }
+    }
+
+    $poderFogoMap = @{ "Low"="Baixo";"Mid-Low"="Medio-Baixo";"Medium"="Medio";"Mid-High"="Medio-Alto";"High"="Alto" }
+    $canoMap = @{ "Default +"="Padrao +";"FB"="CF";"R+"="A+";"FB D+"="CF D+";"FB D-"="CF D-";"D+ R+"="D+ A+";"Custom"="Custom" }
+    
+    $pfMapNum = @{ "Low"=1; "Mid-Low"=2; "Medium"=3; "Mid-High"=4; "High"=5 }
+    $canoMapNum = @{ "FB D-"=1; "Custom"=2; "FB"=3; "FB D+"=4; "Default +"=5; "R+"=6; "D+"=6; "D+ R+"=7 }
+    
+    $modoMapNum = @{
+        "Pump-Action" = 1; "Bolt-Action" = 1
+        "3-RB" = 2
+        "Semi" = 3; "Semi, 3-RB" = 3
+        "Full" = 4; "Semi, Full" = 4; "2-RB, Semi, Full" = 4; "3-RB, Semi, Full" = 4
+    }
+
+    $weaponClassesPt = @{}
+    $global:WeaponClassToPortugueseMap.GetEnumerator() | ForEach-Object { $weaponClassesPt[$_.Key] = $_.Value }
+
+    $allWeapons = @()
+    $wFiles = Get-ChildItem -Path $weaponsPath -Filter "*.txt" -File
+    foreach ($f in $wFiles) {
+        $c = Get-Content $f.FullName
+        if ($c.Count -ge 13) {
+            $stabArma = if ($c.Count -ge 14) { [int]$c[13] } else { 0 }
+            
+            $modoDisplay = $c[9].Replace('Bolt-Action','A.Ferrolho').Replace('Pump-Action','A.Bombeamento').Replace('Full','Auto')
+            $poderDisplay = if ($poderFogoMap.ContainsKey($c[11])) { $poderFogoMap[$c[11]] } else { $c[11] }
+            $canoDisplay = if ($canoMap.ContainsKey($c[12])) { $canoMap[$c[12]] } else { $c[12] }
+            
+            $pfNum = if ($pfMapNum.ContainsKey($c[11])) { $pfMapNum[$c[11]] } else { 0 }
+            $cnNum = if ($canoMapNum.ContainsKey($c[12])) { $canoMapNum[$c[12]] } else { 0 }
+            $mdNum = if ($modoMapNum.ContainsKey($c[9])) { $modoMapNum[$c[9]] } else { 0 }
+
+            $allWeapons += [PSCustomObject]@{
+                Nome=$f.BaseName; Classe=$c[0]; ClasseDisplay=$weaponClassesPt[$c[0]]; Calibre=$c[1]
+                VerticalRecoil=[int]$c[2]; HorizontalRecoil=[int]$c[3]; Ergonomia=[int]$c[4]
+                EstabilidadeArma=$stabArma; Precisao=[int]$c[5]; Estabilidade=[int]$c[6]
+                Alcance=[int]$c[7]; Velocidade=[int]$c[8]
+                ModoDisparo=$c[9]; ModoDisparoDisplay=$modoDisplay; ModoDisparoNum=$mdNum
+                Cadencia=[int]$c[10]; PoderFogo=$c[11]; PoderFogoDisplay=$poderDisplay; PoderFogoNum=$pfNum
+                Cano=$c[12]; CanoDisplay=$canoDisplay; CanoNum=$cnNum
+            }
+        }
+    }
+
+    $allAmmo = @()
+    $calDirs = Get-ChildItem -Path $AmmoPath -Directory
+    foreach ($d in $calDirs) {
+        $aFiles = Get-ChildItem -Path $d.FullName -Filter "*.txt" -File
+        foreach ($f in $aFiles) {
+            $c = Get-Content $f.FullName
+            if ($c.Count -ge 9) {
+                $chanceDisp = switch($c[8]){'Low'{'Baixo'};'Medium'{'Medio'};'High'{'Alto'};default{'//////'}}
+                $chanceNum = switch($c[8]){'Low'{1};'Medium'{2};'High'{3};default{0}}
+                
+                $allAmmo += [PSCustomObject]@{
+                    Nome=$f.BaseName; Calibre=$d.Name
+                    Level=[int]$c[0]; Penetracao=[int]$c[1]
+                    DanoBase=$c[2]; DanoBaseNum=if($c[2]-match'\((\d+)\)'){[int]$Matches[1]}else{[int]($c[2]-replace'[^\d]','')}
+                    DanoArmadura=[int]$c[3]
+                    Velocidade=[int]$c[4]; Precisao=[int]$c[5]
+                    RecuoVert=[int]$c[6]; RecuoHoriz=[int]$c[7]
+                    Wound=$chanceDisp; WoundNum=$chanceNum
+                }
+            }
+        }
+    }
+
+    $firstRun = $true
+
+    do {
+        if ($firstRun) {
+            $newFilters = Show-AdvancedFilterScreen -WeaponItems $allWeapons -AmmoItems $allAmmo -CurrentFilters $script:advFilters
+            if (-not $newFilters) { (Get-Host).UI.RawUI.CursorSize = $originalCursorSize; return }
+            $script:advFilters = $newFilters
+            $firstRun = $false
+        }
+
+        $filteredWeapons = $allWeapons
+        $filteredAmmo = $allAmmo
+
+        if ($script:advFilters.SelectedValues.Count -gt 0) {
+            $sv = $script:advFilters.SelectedValues
+            
+            if ($sv["ClasseDisplay"]) { $filteredWeapons = $filteredWeapons | Where-Object { $_.ClasseDisplay -notin $sv["ClasseDisplay"] } }
+            if ($sv["Calibre"]) { $filteredWeapons = $filteredWeapons | Where-Object { $_.Calibre -notin $sv["Calibre"] } }
+            if ($sv["ModoDisparoDisplay"]) { $filteredWeapons = $filteredWeapons | Where-Object { $_.ModoDisparoDisplay -notin $sv["ModoDisparoDisplay"] } }
+            if ($sv["PoderFogoDisplay"]) { $filteredWeapons = $filteredWeapons | Where-Object { $_.PoderFogoDisplay -notin $sv["PoderFogoDisplay"] } }
+            if ($sv["CanoDisplay"]) { $filteredWeapons = $filteredWeapons | Where-Object { $_.CanoDisplay -notin $sv["CanoDisplay"] } }
+
+            if ($sv["Level"]) { $filteredAmmo = $filteredAmmo | Where-Object { $_.Level -notin $sv["Level"] } }
+            if ($sv["Wound"]) { $filteredAmmo = $filteredAmmo | Where-Object { $_.Wound -notin $sv["Wound"] } }
+
+            $validWeaponCalibers = $filteredWeapons.Calibre | Select-Object -Unique
+            $filteredAmmo = $filteredAmmo | Where-Object { $_.Calibre -in $validWeaponCalibers }
+
+            $validAmmoCalibers = $filteredAmmo.Calibre | Select-Object -Unique
+            $filteredWeapons = $filteredWeapons | Where-Object { $_.Calibre -in $validAmmoCalibers }
+        }
+
+        $filteredAmmo = $filteredAmmo | Sort-Object Level, DanoBaseNum, Penetracao -Descending
+        $filteredWeapons = $filteredWeapons | Sort-Object Calibre, Nome
+
+        $statsW = @{}
+        $propsW = @("VerticalRecoil", "HorizontalRecoil", "Ergonomia", "EstabilidadeArma", "Precisao", "Estabilidade", "Alcance", "Velocidade", "Cadencia", "PoderFogoNum", "CanoNum", "ModoDisparoNum")
+        if ($filteredWeapons.Count -gt 0) { foreach ($p in $propsW) { $statsW[$p] = $filteredWeapons | Measure-Object -Property $p -Minimum -Maximum } }
+
+        $statsA = @{}
+        $propsA = @("Level", "Penetracao", "DanoBaseNum", "DanoArmadura", "Velocidade", "Precisao", "RecuoVert", "RecuoHoriz", "WoundNum")
+        if ($filteredAmmo.Count -gt 0) { foreach ($p in $propsA) { $statsA[$p] = $filteredAmmo | Measure-Object -Property $p -Minimum -Maximum } }
+
+        (Get-Host).UI.RawUI.CursorSize = 0
+        Clear-Host
+        
+        Write-Host "=== Tela de Comparacao Avancada ==="; Write-Host
+        Write-Host "--- ARMAS ENCONTRADAS ---" -ForegroundColor Cyan
+        Write-Host "Nome da Arma      Calibre      CRV  CRH  Ergo Esta.DA Prec Esta.SM Dis(m) Vel.bo  ModoDisparo       Cad   Poder.DFG   Melh.Cano"
+        Write-Host "----------------  -----------  ---  ---  ---- ------- ---- ------- ------ ------  ----------------  ---   ----------  ---------"
+
+        foreach ($w in $filteredWeapons) {
+            Write-Host ("{0,-17}" -f $w.Nome) -NoNewline
+            Write-Host (" {0,-12}" -f $w.Calibre) -NoNewline
+
+            $cols = @(
+                @{ Val=$w.VerticalRecoil;   Prop="VerticalRecoil";   W=4; LowerBest=$false },
+                @{ Val=$w.HorizontalRecoil; Prop="HorizontalRecoil"; W=4; LowerBest=$false },
+                @{ Val=$w.Ergonomia;        Prop="Ergonomia";        W=4; LowerBest=$false },
+                @{ Val=$w.EstabilidadeArma; Prop="EstabilidadeArma"; W=7; LowerBest=$false },
+                @{ Val=$w.Precisao;         Prop="Precisao";         W=4; LowerBest=$false },
+                @{ Val=$w.Estabilidade;     Prop="Estabilidade";     W=7; LowerBest=$false },
+                @{ Val=$w.Alcance;          Prop="Alcance";          W=6; LowerBest=$false },
+                @{ Val=$w.Velocidade;       Prop="Velocidade";       W=7; LowerBest=$false }
+            )
+
+            foreach ($c in $cols) {
+                $st = $statsW[$c.Prop]
+                $color = $Host.UI.RawUI.ForegroundColor
+                if ($st.Minimum -ne $st.Maximum) {
+                    if ($c.LowerBest) {
+                        if ($c.Val -eq $st.Minimum) { $color = "Green" } elseif ($c.Val -eq $st.Maximum) { $color = "Red" }
+                    } else {
+                        if ($c.Val -eq $st.Maximum) { $color = "Green" } elseif ($c.Val -eq $st.Minimum) { $color = "Red" }
+                    }
+                }
+                Write-Host (" {0,-$($c.W)}" -f $c.Val) -NoNewline -ForegroundColor $color
+            }
+
+            $mdVal = $w.ModoDisparoNum
+            $stMd = $statsW["ModoDisparoNum"]
+            $mdColor = $Host.UI.RawUI.ForegroundColor
+            if ($stMd.Minimum -ne $stMd.Maximum) {
+                if ($mdVal -eq $stMd.Maximum) { $mdColor = "Green" } elseif ($mdVal -eq $stMd.Minimum) { $mdColor = "Red" }
+            }
+            Write-Host (" {0,-17}" -f $w.ModoDisparoDisplay) -NoNewline -ForegroundColor $mdColor
+            
+            $cadVal = $w.Cadencia
+            $stCad = $statsW["Cadencia"]
+            $cadColor = $Host.UI.RawUI.ForegroundColor
+            if ($stCad.Minimum -ne $stCad.Maximum) {
+                if ($cadVal -eq $stCad.Maximum) { $cadColor = "Green" } elseif ($cadVal -eq $stCad.Minimum) { $cadColor = "Red" }
+            }
+            Write-Host (" {0,-5}" -f $cadVal) -NoNewline -ForegroundColor $cadColor
+
+            $pfVal = $w.PoderFogoNum
+            $stPf = $statsW["PoderFogoNum"]
+            $pfColor = $Host.UI.RawUI.ForegroundColor
+            if ($stPf.Minimum -ne $stPf.Maximum) {
+                if ($pfVal -eq $stPf.Maximum) { $pfColor = "Green" } elseif ($pfVal -eq $stPf.Minimum) { $pfColor = "Red" }
+            }
+            Write-Host (" {0,-11}" -f $w.PoderFogoDisplay) -NoNewline -ForegroundColor $pfColor
+
+            $cnVal = $w.CanoNum
+            $stCn = $statsW["CanoNum"]
+            $cnColor = $Host.UI.RawUI.ForegroundColor
+            if ($stCn.Minimum -ne $stCn.Maximum) {
+                if ($cnVal -eq $stCn.Maximum) { $cnColor = "Green" } elseif ($cnVal -eq $stCn.Minimum) { $cnColor = "Red" }
+            }
+            Write-Host (" {0,-9}" -f $w.CanoDisplay) -ForegroundColor $cnColor
+        }
+
+        Write-Host; 
+        
+        Write-Host "--- MUNICOES COMPATIVEIS ---" -ForegroundColor Cyan
+        Write-Host "Nome da Municao       Lv Pen Dano Base      Dano blindag Vel(m/s) Prec CRV CRH Chance Ferir  Calibre"
+        Write-Host "-------------------   -- --- -------------- ------------ -------- ---- --- --- ------------  ---------"
+
+        foreach ($a in $filteredAmmo) {
+            Write-Host ("{0,-19}" -f $a.Nome) -NoNewline
+            Write-Host "   " -NoNewline
+
+            $colsAmmo = @(
+                @{ Disp=$a.Level;        Num=$a.Level;        Prop="Level";        W=2;  LowerBest=$false },
+                @{ Disp=$a.Penetracao;   Num=$a.Penetracao;   Prop="Penetracao";   W=3;  LowerBest=$false; Space=" " },
+                @{ Disp=$a.DanoBase;     Num=$a.DanoBaseNum;  Prop="DanoBaseNum";  W=14; LowerBest=$false; Space=" " },
+                @{ Disp=$a.DanoArmadura; Num=$a.DanoArmadura; Prop="DanoArmadura"; W=12; LowerBest=$false; Space=" " },
+                @{ Disp=$a.Velocidade;   Num=$a.Velocidade;   Prop="Velocidade";   W=8;  LowerBest=$false; Space=" " },
+                @{ Disp=$a.Precisao;     Num=$a.Precisao;     Prop="Precisao";     W=4;  LowerBest=$false; Space=" " },
+                @{ Disp=$a.RecuoVert;    Num=$a.RecuoVert;    Prop="RecuoVert";    W=3;  LowerBest=$false; Space=" " },
+                @{ Disp=$a.RecuoHoriz;   Num=$a.RecuoHoriz;   Prop="RecuoHoriz";   W=3;  LowerBest=$false; Space=" " },
+                @{ Disp=$a.Wound;        Num=$a.WoundNum;     Prop="WoundNum";     W=12; LowerBest=$false; Space=" " }
+            )
+
+            foreach ($c in $colsAmmo) {
+                if ($c.Space) { Write-Host $c.Space -NoNewline }
+                
+                $st = $statsA[$c.Prop]
+                $color = $Host.UI.RawUI.ForegroundColor
+                
+                if ($st.Minimum -ne $st.Maximum) {
+                    if ($c.LowerBest) {
+                        if ($c.Num -eq $st.Minimum) { $color = "Green" } elseif ($c.Num -eq $st.Maximum) { $color = "Red" }
+                    } else {
+                        if ($c.Num -eq $st.Maximum) { $color = "Green" } elseif ($c.Num -eq $st.Minimum) { $color = "Red" }
+                    }
+                }
+                Write-Host ("{0,-$($c.W)}" -f $c.Disp) -NoNewline -ForegroundColor $color
+            }
+
+            Write-Host "  " -NoNewline
+            Write-Host ("{0,-9}" -f $a.Calibre)
+        }
+
+        Write-Host; Write-Host "Botoes: " -NoNewline
+        Write-Host "F1" -ForegroundColor Cyan -NoNewline; Write-Host " - Novo Filtro | " -NoNewline
+        Write-Host "F2" -ForegroundColor Red -NoNewline; Write-Host " - Voltar ao menu | " -NoNewline
+        Write-Host "F3" -ForegroundColor Yellow -NoNewline; Write-Host " - Legenda Armas | " -NoNewline
+        Write-Host "F4" -ForegroundColor Magenta -NoNewline; Write-Host " - Legenda Municao"
+
+        $key = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown").VirtualKeyCode
+        switch ($key) {
+            112 { 
+                $newFilters = Show-AdvancedFilterScreen -WeaponItems $allWeapons -AmmoItems $allAmmo -CurrentFilters $script:advFilters
+                if ($newFilters) { $script:advFilters = $newFilters }
+            }
+            113 { 
+                $script:advFilters = @{ SelectedValues = @{}; SelectionMethod = @{} }
+                (Get-Host).UI.RawUI.CursorSize = $originalCursorSize; return 
+            }
+            114 { 
+                Show-WeaponLegend
+                continue
+            }
+            115 { 
+                Show-AmmoLegend
+                continue
             }
         }
     } while ($true)
@@ -2862,29 +3463,30 @@ function Search-GastronomyWithFilters {
         Write-Host "=== Busca gastronomica com filtro ==="; Write-Host
         
         Write-Host "Botoes: " -NoNewline
-        Write-Host "F1" -ForegroundColor Cyan -NoNewline
-        Write-Host " - Mudar Criterio ($criterioOrdenacao) | " -NoNewline
-        Write-Host "F2" -ForegroundColor Gray -NoNewline
+        Write-Host "F1" -ForegroundColor Green -NoNewline
+        Write-Host " - Categoria ($filtroCategoria) | " -NoNewline
+        Write-Host "F2" -ForegroundColor Cyan -NoNewline
+        Write-Host " - Mudar Criterio ($criterioOrdenacao)"
+        
+        Write-Host "Botoes: " -NoNewline
+        Write-Host "F3" -ForegroundColor Gray -NoNewline
         Write-Host " - Mudar Ordem ($ordemAtual) | " -NoNewline
         Write-Host "F4" -ForegroundColor Yellow -NoNewline
-        Write-Host " - Ver legenda"
-        Write-Host "Filtro: " -NoNewline
-        Write-Host "F3" -ForegroundColor Green -NoNewline
-        Write-Host " - Categoria ($filtroCategoria) | " -NoNewline
+        Write-Host " - Ver legenda | " -NoNewline
         Write-Host "F5" -ForegroundColor Red -NoNewline
         Write-Host " - Voltar ao menu"; Write-Host
+        
         if ($criterioOrdenacao -eq "Alfabetico") { Write-Host ("{0,-35}" -f "Nome") -ForegroundColor Green -NoNewline } else { Write-Host ("{0,-35}" -f "Nome") -NoNewline }
         if ($criterioOrdenacao -eq "Hidratacao") { Write-Host ("{0,-11}" -f "Hidratacao") -ForegroundColor Green -NoNewline } else { Write-Host ("{0,-11}" -f "Hidratacao") -NoNewline }
         if ($criterioOrdenacao -eq "Energia") { Write-Host ("{0,-8}" -f "Energia") -ForegroundColor Green -NoNewline } else { Write-Host ("{0,-8}" -f "Energia") -NoNewline }
-        Write-Host ("{0,-12}" -f "Rec.Stamina") -NoNewline # Coluna sem ordenação, cor padrão
-        Write-Host ("{0,-12}" -f "Espaco(HxV)") -NoNewline # Coluna sem ordenação, cor padrão
+        Write-Host ("{0,-12}" -f "Rec.Stamina") -NoNewline
+        Write-Host ("{0,-12}" -f "Espaco(HxV)") -NoNewline
         if ($criterioOrdenacao -eq "Hidratacao por slot") { Write-Host ("{0,-12}" -f "Hidrat.Slot") -ForegroundColor Green -NoNewline } else { Write-Host ("{0,-12}" -f "Hidrat.Slot") -NoNewline }
         if ($criterioOrdenacao -eq "Energia por slot") { Write-Host ("{0,-11}" -f "Energ.Slot") -ForegroundColor Green -NoNewline } else { Write-Host ("{0,-11}" -f "Energ.Slot") -NoNewline }
-        Write-Host ("{0,-5}" -f "Delay") # Coluna sem ordenação, cor padrão
+        Write-Host ("{0,-5}" -f "Delay")
         
         Write-Host "---------------------------------  ---------- ------- ----------- ----------- ----------- ---------- -----"
         foreach ($item in $gastronomyData) {
-            # Traduz "None" para "/////" antes de exibir
             $recStaminaDisplay = $item.RecStamina
             if ($recStaminaDisplay -eq 'None') {
                 $recStaminaDisplay = '/////'
@@ -2900,20 +3502,23 @@ function Search-GastronomyWithFilters {
         }
         $key = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
         switch ($key.VirtualKeyCode) {
-            112 { # F1 - Mudar critério
-                (Get-Host).UI.RawUI.CursorSize = $originalCursorSize
-                $novoCriterio = Show-Menu -Title "Selecione o criterio" -Options $criterios -FlickerFree
-                (Get-Host).UI.RawUI.CursorSize = 0
-                if ($novoCriterio) { $criterioOrdenacao = $novoCriterio }
-            }
-            113 { # F2 - Mudar ordem
-                $ordemAtual = if ($ordemAtual -eq "Decrescente") { "Crescente" } else { "Decrescente" }
-            }
-            114 { # F3 - Mudar categoria
+            112 { # F1 - Mudar categoria
                 (Get-Host).UI.RawUI.CursorSize = $originalCursorSize
                 $novaCategoria = Show-Menu -Title "Selecione a categoria" -Options $categorias -FlickerFree
                 (Get-Host).UI.RawUI.CursorSize = 0
                 if ($novaCategoria) { $filtroCategoria = $novaCategoria }
+            }
+            113 { # F2 - Mudar critério
+                (Get-Host).UI.RawUI.CursorSize = $originalCursorSize
+                $novoCriterio = Show-Menu -Title "Selecione o criterio" -Options $criterios -FlickerFree
+                (Get-Host).UI.RawUI.CursorSize = 0
+                if ($novoCriterio) { 
+                    $criterioOrdenacao = $novoCriterio
+                    $ordemAtual = "Crescente" 
+                }
+            }
+            114 { # F3 - Mudar ordem
+                $ordemAtual = if ($ordemAtual -eq "Decrescente") { "Crescente" } else { "Decrescente" }
             }
             115 { # F4 - Ver legenda
                 Show-GastronomyLegend
@@ -2932,7 +3537,7 @@ function Search-PharmaceuticalWithFilters {
     (Get-Host).UI.RawUI.CursorSize = 0
     $filtroCategoria = "Analgesico"
     $criterioOrdenacao = "Usos"
-    $ordemAtual = "Decrescente" 
+    $ordemAtual = "Crescente" 
     
     $categorias = @("Analgesico", "Bandagem", "Kit cirurgico", "Nebulizador", "Kit medico", "Estimulantes")
     do {
@@ -2946,7 +3551,10 @@ function Search-PharmaceuticalWithFilters {
         }
         $config = $categoryMap[$filtroCategoria]
         $criteriosDisponiveis = $config.Criteria
-        if ($criterioOrdenacao -notin $criteriosDisponiveis) { $criterioOrdenacao = $criteriosDisponiveis[0] }
+        if ($criterioOrdenacao -notin $criteriosDisponiveis) { 
+            $criterioOrdenacao = $criteriosDisponiveis[0]
+            $ordemAtual = "Crescente"
+        }
         $pharmaData = @()
         $itemFiles = Get-ChildItem -Path (Join-Path $global:databasePath $config.Folder) -Filter "*.txt" -File
         foreach ($file in $itemFiles) {
@@ -2983,62 +3591,171 @@ function Search-PharmaceuticalWithFilters {
         Write-Host "Botoes: " -NoNewline
         Write-Host "F4" -ForegroundColor Magenta -NoNewline; Write-Host " - Ver legenda | " -NoNewline
         Write-Host "F5" -ForegroundColor Red -NoNewline; Write-Host " - Voltar ao menu"; Write-Host
+        
         switch ($filtroCategoria) {
             "Analgesico" {
-                $header = "{0,-25}  {1,-5}  {2,-18}  {3,-13}  {4,-17}  {5,-18}  {6,-10}" -f "Nome", "Usos", "Duracao", "Desidratacao", "Tempo de Atraso", "Dur. Max", "Des. Max"
-                $separator = "-------------------------  -----  ------------------  -------------  -----------------  ------------------  --------"
-                Write-Host $header; Write-Host $separator
+                Write-Host ("{0,-25}" -f "Nome") -NoNewline
+                Write-Host "  " -NoNewline
+                Write-Host ("{0,-5}" -f "Usos") -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Usos") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
+                Write-Host "  " -NoNewline
+                Write-Host ("{0,-18}" -f "Duracao") -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Duracao") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
+                Write-Host "  " -NoNewline
+                Write-Host ("{0,-13}" -f "Desidratacao") -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Desidratacao") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
+                Write-Host "  " -NoNewline
+                Write-Host ("{0,-17}" -f "Tempo de Atraso") -NoNewline
+                Write-Host "  " -NoNewline
+                Write-Host ("{0,-18}" -f "Dur. Max") -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Duracao maxima") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
+                Write-Host "  " -NoNewline
+                Write-Host ("{0,-10}" -f "Des. Max")
+                Write-Host "-------------------------  ----   ------------------  ------------   ---------------    ------------------  --------"
                 
                 foreach ($item in $pharmaData) {
-                    $line = "{0,-25}  {1,-5}  {2,-18}  {3,-13}  {4,-17}  {5,-18}  {6,-10}" -f $item.Nome, $item.Usos, $item.Duracao, $item.Desidratacao, $item.TempoAtraso, $item.DurMax, $item.DesMax
-                    Write-Host $line
+                    Write-Host ("{0,-25}" -f $item.Nome) -NoNewline
+                    Write-Host "  " -NoNewline
+                    Write-Host ("{0,-5}" -f $item.Usos) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Usos") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
+                    Write-Host "  " -NoNewline
+                    Write-Host ("{0,-18}" -f $item.Duracao) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Duracao") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
+                    Write-Host "  " -NoNewline
+                    Write-Host ("{0,-13}" -f $item.Desidratacao) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Desidratacao") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
+                    Write-Host "  " -NoNewline
+                    Write-Host ("{0,-17}" -f $item.TempoAtraso) -NoNewline
+                    Write-Host "  " -NoNewline
+                    Write-Host ("{0,-18}" -f $item.DurMax) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Duracao maxima") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
+                    Write-Host "  " -NoNewline
+                    Write-Host ("{0,-10}" -f $item.DesMax)
                 }
             }
             "Bandagem" {
-                $header = "{0,-25}  {1,-5}  {2,-16}  {3,-20}" -f "Nome", "Usos", "Tempo de Atraso", "Custo Durabilidade"
-                $separator = "-------------------------  -----  ----------------  --------------------"
-                Write-Host $header; Write-Host $separator
+                Write-Host ("{0,-25}" -f "Nome") -NoNewline
+                Write-Host "  " -NoNewline
+                Write-Host ("{0,-5}" -f "Usos") -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Usos") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
+                Write-Host "  " -NoNewline
+                Write-Host ("{0,-16}" -f "Tempo de Atraso") -NoNewline
+                Write-Host "  " -NoNewline
+                Write-Host ("{0,-20}" -f "Custo Durabilidade")
+                Write-Host "-------------------------  ----   ---------------   ------------------"
                 foreach ($item in $pharmaData) {
-                    $line = "{0,-25}  {1,-5}  {2,-16}  {3,-20}" -f $item.Nome, $item.Usos, $item.TempoAtraso, $item.CustoDurabilidade
-                    Write-Host $line
+                    Write-Host ("{0,-25}" -f $item.Nome) -NoNewline
+                    Write-Host "  " -NoNewline
+                    Write-Host ("{0,-5}" -f $item.Usos) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Usos") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
+                    Write-Host "  " -NoNewline
+                    Write-Host ("{0,-16}" -f $item.TempoAtraso) -NoNewline
+                    Write-Host "  " -NoNewline
+                    Write-Host ("{0,-20}" -f $item.CustoDurabilidade)
                 }
             }
             "Kit cirurgico" {
-                $header = "{0,-32}  {1,-5}  {2,-15}  {3,-13}  {4,-9}  {5,-11}  {6,-12}" -f "Nome", "Usos", "Tempo de Atraso", "Desidratacao", "Rec. HP", "Custo Dur.", "Espaco(HxV)"
-                $separator = "--------------------------------  -----  ---------------  -------------  ---------  -----------  -----------"
-                Write-Host $header; Write-Host $separator
+                Write-Host ("{0,-32}" -f "Nome") -NoNewline
+                Write-Host "  " -NoNewline
+                Write-Host ("{0,-5}" -f "Usos") -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Usos") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
+                Write-Host "  " -NoNewline
+                Write-Host ("{0,-15}" -f "Tempo de Atraso") -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Tempo de Atraso") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
+                Write-Host "  " -NoNewline
+                Write-Host ("{0,-13}" -f "Desidratacao") -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Desidratacao") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
+                Write-Host "  " -NoNewline
+                Write-Host ("{0,-9}" -f "Rec. HP") -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Recuperacao por uso") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
+                Write-Host "  " -NoNewline
+                Write-Host ("{0,-11}" -f "Custo Dur.") -NoNewline
+                Write-Host "  " -NoNewline
+                Write-Host ("{0,-12}" -f "Espaco (HxV)") -ForegroundColor $(if ($criterioOrdenacao -eq "Espaco(HxV)") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
+                Write-Host "--------------------------------  ----   ---------------  ------------   -------    ----------   ------------"
                 
                 foreach ($item in $pharmaData) {
-                    $line = "{0,-32}  {1,-5}  {2,-15}  {3,-13}  {4,-9}  {5,-11}  {6,-12}" -f $item.Nome, $item.Usos, $item.TempoAtraso, $item.Desidratacao, $item.RecHP, $item.CustoDur, $item.EspacoHV
-                    Write-Host $line
+                    Write-Host ("{0,-32}" -f $item.Nome) -NoNewline
+                    Write-Host "  " -NoNewline
+                    Write-Host ("{0,-5}" -f $item.Usos) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Usos") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
+                    Write-Host "  " -NoNewline
+                    Write-Host ("{0,-15}" -f $item.TempoAtraso) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Tempo de Atraso") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
+                    Write-Host "  " -NoNewline
+                    Write-Host ("{0,-13}" -f $item.Desidratacao) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Desidratacao") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
+                    Write-Host "  " -NoNewline
+                    Write-Host ("{0,-9}" -f $item.RecHP) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Recuperacao por uso") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
+                    Write-Host "  " -NoNewline
+                    Write-Host ("{0,-11}" -f $item.CustoDur) -NoNewline
+                    Write-Host "  " -NoNewline
+                    Write-Host ("{0,-12}" -f $item.EspacoHV) -ForegroundColor $(if ($criterioOrdenacao -eq "Espaco(HxV)") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
                 }
             }
             "Nebulizador" {
-                $header = "{0,-25}  {1,-5}  {2,-16}  {3,-20}" -f "Nome", "Usos", "Tempo de Atraso", "Custo Durabilidade"
-                $separator = "-------------------------  -----  ----------------  --------------------"
-                Write-Host $header; Write-Host $separator
+                Write-Host ("{0,-25}" -f "Nome") -NoNewline
+                Write-Host "  " -NoNewline
+                Write-Host ("{0,-5}" -f "Usos") -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Usos") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
+                Write-Host "  " -NoNewline
+                Write-Host ("{0,-16}" -f "Tempo de Atraso") -NoNewline
+                Write-Host "  " -NoNewline
+                Write-Host ("{0,-20}" -f "Custo Durabilidade")
+                Write-Host "-------------------------  ----   ---------------   ------------------"
                 foreach ($item in $pharmaData) {
-                    $line = "{0,-25}  {1,-5}  {2,-16}  {3,-20}" -f $item.Nome, $item.Usos, $item.TempoAtraso, $item.CustoDurabilidade
-                    Write-Host $line
+                    Write-Host ("{0,-25}" -f $item.Nome) -NoNewline
+                    Write-Host "  " -NoNewline
+                    Write-Host ("{0,-5}" -f $item.Usos) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Usos") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
+                    Write-Host "  " -NoNewline
+                    Write-Host ("{0,-16}" -f $item.TempoAtraso) -NoNewline
+                    Write-Host "  " -NoNewline
+                    Write-Host ("{0,-20}" -f $item.CustoDurabilidade)
                 }
             }
             "Kit medico" {
-                $header = "{0,-26}  {1,-13}  {2,-13}  {3,-10}  {4,-6}  {5,-11}  {6,-12}  {7,-16}" -f "Nome", "Durabilidade", "Desidratacao", "Vel. Cura", "Delay", "Custo Dur.", "Espaco(HxV)", "Durab. p/ Slot"
-                $separator = "--------------------------  -------------  -------------  ----------  ------  -----------  ------------  --------------"
-                Write-Host $header; Write-Host $separator
+                Write-Host ("{0,-26}" -f "Nome") -NoNewline
+                Write-Host "  " -NoNewline
+                Write-Host ("{0,-13}" -f "Durabilidade") -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Durabilidade") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
+                Write-Host " " -NoNewline
+                Write-Host ("{0,-13}" -f "Desidratacao") -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Desidratacao") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
+                Write-Host "  " -NoNewline
+                Write-Host ("{0,-10}" -f "Vel. Cura") -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Velocidade de cura") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
+                Write-Host " " -NoNewline
+                Write-Host ("{0,-6}" -f "Delay") -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Delay") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
+                Write-Host "  " -NoNewline
+                Write-Host ("{0,-11}" -f "Custo Dur.") -NoNewline
+                Write-Host " " -NoNewline
+                Write-Host ("{0,-12}" -f "Espaco (HxV)") -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Espaco(HxV)") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
+                Write-Host "  " -NoNewline
+                Write-Host ("{0,-16}" -f "Durab. p/ Slot") -ForegroundColor $(if ($criterioOrdenacao -eq "Durabilidade por slot") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
+                Write-Host "--------------------------  ------------  ------------   ---------  -----   ----------  ------------  --------------"
                 
                 foreach ($item in $pharmaData) {
-                    $line = "{0,-26}  {1,-13}  {2,-13}  {3,-10}  {4,-6}  {5,-11}  {6,-12}  {7,-16}" -f $item.Nome, $item.Durabilidade, $item.Desidratacao, $item.VelCura, $item.Delay, $item.CustoDur, $item.EspacoHV, $item.DurabSlot
-                    Write-Host $line
+                    Write-Host ("{0,-26}" -f $item.Nome) -NoNewline
+                    Write-Host "  " -NoNewline
+                    Write-Host ("{0,-13}" -f $item.Durabilidade) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Durabilidade") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
+                    Write-Host " " -NoNewline
+                    Write-Host ("{0,-13}" -f $item.Desidratacao) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Desidratacao") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
+                    Write-Host "  " -NoNewline
+                    Write-Host ("{0,-10}" -f $item.VelCura) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Velocidade de cura") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
+                    Write-Host " " -NoNewline
+                    Write-Host ("{0,-6}" -f $item.Delay) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Delay") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
+                    Write-Host "  " -NoNewline
+                    Write-Host ("{0,-11}" -f $item.CustoDur) -NoNewline
+                    Write-Host " " -NoNewline
+                    Write-Host ("{0,-12}" -f $item.EspacoHV) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Espaco(HxV)") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
+                    Write-Host "  " -NoNewline
+                    Write-Host ("{0,-16}" -f $item.DurabSlot) -ForegroundColor $(if ($criterioOrdenacao -eq "Durabilidade por slot") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
                 }
             }
             "Estimulantes" {
-                $header = "{0,-25}  {1,-17}  {2,-18}  {3,-13}  {4,-13}  {5,-6}" -f "Nome", "Efeito Principal", "Duracao", "Desidratacao", "Red. Energia", "Delay"
-                $separator = "-------------------------  -----------------  ------------------  -------------  -------------  -----"
-                Write-Host $header; Write-Host $separator
+                Write-Host ("{0,-25}" -f "Nome") -NoNewline
+                Write-Host "  " -NoNewline
+                Write-Host ("{0,-17}" -f "Efeito Principal") -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Efeito Principal") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
+                Write-Host "  " -NoNewline
+                Write-Host ("{0,-18}" -f "Duracao") -NoNewline
+                Write-Host "  " -NoNewline
+                Write-Host ("{0,-13}" -f "Desidratacao") -NoNewline
+                Write-Host "  " -NoNewline
+                Write-Host ("{0,-13}" -f "Red. Energia") -NoNewline
+                Write-Host "  " -NoNewline
+                Write-Host ("{0,-6}" -f "Delay")
+                Write-Host "-------------------------  ----------------   ------------------  ------------   ------------   -----"
                 foreach ($item in $pharmaData) {
-                    $line = "{0,-25}  {1,-17}  {2,-18}  {3,-13}  {4,-13}  {5,-6}" -f $item.Nome, $item.EfeitoPrincipal, $item.Duracao, $item.Desidratacao, $item.RedEnergia, $item.Delay
-                    Write-Host $line
+                    Write-Host ("{0,-25}" -f $item.Nome) -NoNewline
+                    Write-Host "  " -NoNewline
+                    Write-Host ("{0,-17}" -f $item.EfeitoPrincipal) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Efeito Principal") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
+                    Write-Host "  " -NoNewline
+                    Write-Host ("{0,-18}" -f $item.Duracao) -NoNewline
+                    Write-Host "  " -NoNewline
+                    Write-Host ("{0,-13}" -f $item.Desidratacao) -NoNewline
+                    Write-Host "  " -NoNewline
+                    Write-Host ("{0,-13}" -f $item.RedEnergia) -NoNewline
+                    Write-Host "  " -NoNewline
+                    Write-Host ("{0,-6}" -f $item.Delay)
                 }
             }
         }
@@ -3055,7 +3772,10 @@ function Search-PharmaceuticalWithFilters {
                     (Get-Host).UI.RawUI.CursorSize = $originalCursorSize
                     $novoCriterio = Show-Menu -Title "Selecione o criterio" -Options $criteriosDisponiveis -FlickerFree
                     (Get-Host).UI.RawUI.CursorSize = 0
-                    if ($novoCriterio) { $criterioOrdenacao = $novoCriterio }
+                    if ($novoCriterio) { 
+                        $criterioOrdenacao = $novoCriterio
+                        $ordemAtual = "Crescente" 
+                    }
                 }
             }
             114 { 
@@ -3198,7 +3918,22 @@ function Search-HelmetsWithFilters {
     if (-not $script:helmetFilters) {
         $script:helmetFilters = @{ SelectedValues = @{}; SelectionMethod = @{} }
     }
-    $criterios = @("Alfabetico", "Peso", "Durabilidade", "Classe de Blindagem", "Cl Max Masc", "Material", "Bloqueio", "Penalidade de movimento", "Ergonomia", "Area Protegida", "Chance de Ricochete", "Captura de som", "Reducao de ruido", "Acessorio")
+    $criterios = @(
+        "Alfabetico", 
+        "Peso", 
+        "Durabilidade", 
+        "Classe de Blindagem", 
+        "Bloqueio", 
+        "Penalidade de movimento", 
+        "Ergonomia", 
+        "Area Protegida", 
+        "Chance de Ricochete", 
+        "Captura de som", 
+        "Reducao de ruido", 
+        "Acessorio",
+        "Classe maxima da mascara compativel"
+    )
+
     $materialMap = @{ "Aramid"="Aramida";"Polyethylene"="Polietileno";"Hardened Steel"="Aco endurecido";"Composite"="Composto";"Aluminum"="Aluminio";"Titanium"="Titanio" }
     $bloqueioMap = @{ "Low"="Baixo"; "Moderate"="Moderado"; "Severe"="Grave" }
     $areaMap = @{ "Head"="Cabeca";"Head, Ears"="Cabeca, Ouvidos";"Head, Ears, Face"="Cabeca, Ouvidos, Rosto" }
@@ -3280,7 +4015,7 @@ function Search-HelmetsWithFilters {
         if ($criterioOrdenacao -eq "Peso") { Write-Host ("{0,-6}" -f "Peso") -ForegroundColor Green -NoNewline } else { Write-Host ("{0,-6}" -f "Peso") -NoNewline }
         if ($criterioOrdenacao -eq "Durabilidade") { Write-Host ("{0,-7}" -f "Dur.") -ForegroundColor Green -NoNewline } else { Write-Host ("{0,-7}" -f "Dur.") -NoNewline }
         if ($criterioOrdenacao -eq "Classe de Blindagem") { Write-Host ("{0,-4}" -f "Cl") -ForegroundColor Green -NoNewline } else { Write-Host ("{0,-4}" -f "Cl") -NoNewline }
-        if ($criterioOrdenacao -eq "Material") { Write-Host ("{0,-15}" -f "Material") -ForegroundColor Green -NoNewline } else { Write-Host ("{0,-15}" -f "Material") -NoNewline }
+        Write-Host ("{0,-15}" -f "Material") -NoNewline
         if ($criterioOrdenacao -eq "Bloqueio") { Write-Host ("{0,-9}" -f "Bloqueio") -ForegroundColor Green -NoNewline } else { Write-Host ("{0,-9}" -f "Bloqueio") -NoNewline }
         if ($criterioOrdenacao -eq "Penalidade de movimento") { Write-Host ("{0,-6}" -f "Vel.M") -ForegroundColor Green -NoNewline } else { Write-Host ("{0,-6}" -f "Vel.M") -NoNewline }
         if ($criterioOrdenacao -eq "Ergonomia") { Write-Host ("{0,-6}" -f "Ergo") -ForegroundColor Green -NoNewline } else { Write-Host ("{0,-6}" -f "Ergo") -NoNewline }
@@ -3291,16 +4026,16 @@ function Search-HelmetsWithFilters {
         
         if ($criterioOrdenacao -eq "Acessorio") { Write-Host ("{0,-13}" -f "Acessorio") -ForegroundColor Green -NoNewline } else { Write-Host ("{0,-13}" -f "Acessorio") -NoNewline }
         Write-Host " " -NoNewline
-        if ($criterioOrdenacao -eq "Cl Max Masc") { Write-Host ("{0,-11}" -f "Cl Max Masc") -ForegroundColor Green } else { Write-Host ("{0,-11}" -f "Cl Max Masc") }
+        if ($criterioOrdenacao -eq "Classe maxima da mascara compativel") { Write-Host ("{0,-11}" -f "Cl Max Masc") -ForegroundColor Green } else { Write-Host ("{0,-11}" -f "Cl Max Masc") }
         
-        Write-Host "------------------------------  ----  ----   --  -------------- -------- ----- ----- ---------------------- ------ ------ ------ ------------- -----------"
+        Write-Host "------------------------------  ----  ----   --  -------------- -------- ----- ----- ---------------------- ------ ------ ------ -----------   -----------"
         
         foreach ($item in $sortedData) {
             Write-Host ("{0,-32}" -f $item.Nome) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Alfabetico") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
             Write-Host ("{0,-6}" -f $item.Weight) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Peso") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
             Write-Host ("{0,-7}" -f $item.Durability) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Durabilidade") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
             Write-Host ("{0,-4}" -f $item.ArmorClass) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Classe de Blindagem") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
-            Write-Host ("{0,-15}" -f $item.MaterialDisplay) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Material") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
+            Write-Host ("{0,-15}" -f $item.MaterialDisplay) -NoNewline
             Write-Host ("{0,-9}" -f $item.BloqueioDisplay) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Bloqueio") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
             Write-Host ("{0,-6}" -f $item.MovementSpeed) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Penalidade de movimento") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
             Write-Host ("{0,-6}" -f $item.Ergonomics) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Ergonomia") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
@@ -3311,19 +4046,21 @@ function Search-HelmetsWithFilters {
             
             Write-Host ("{0,-13}" -f $item.AcessorioDisplay) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Acessorio") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
             Write-Host " " -NoNewline
-            Write-Host ("{0,-11}" -f $item.ClMaxMasc) -ForegroundColor $(if ($criterioOrdenacao -eq "Cl Max Masc") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
+            Write-Host ("{0,-11}" -f $item.ClMaxMasc) -ForegroundColor $(if ($criterioOrdenacao -eq "Classe maxima da mascara compativel") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
         }
         $key = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
         switch ($key.VirtualKeyCode) {
-            112 { # F1
+            112 {
                 $novoCriterio = Show-Menu -Title "Selecione o criterio" -Options $criterios -FlickerFree
-                (Get-Host).UI.RawUI.CursorSize = 0 
-                if ($novoCriterio) { $criterioOrdenacao = $novoCriterio }
+                (Get-Host).UI.RawUI.CursorSize = 0
+                if ($novoCriterio) { 
+                    $criterioOrdenacao = $novoCriterio
+                }
             }
-            113 { # F2
+            113 {
                 $ordemAtual = if ($ordemAtual -eq "Decrescente") { "Crescente" } else { "Decrescente" }
             }
-            114 { # F3
+            114 {
                 $headerLayout = "  Classe (Cl)  Bloqueio Sonoro   Area Protegida                 Ricochete     Acessorio          Mascara (Classe Maxima)"
                 
                 $columnLabels = ($headerLayout -split '\s{2,}' | Where-Object {$_})
@@ -3346,11 +4083,11 @@ function Search-HelmetsWithFilters {
                 }
                 (Get-Host).UI.RawUI.CursorSize = 0
             }
-            115 { # F4
+            115 {
                 Show-HelmetLegend
                 continue
             }
-            116 { # F5
+            116 {
                 $script:helmetFilters = @{ SelectedValues = @{}; SelectionMethod = @{} }
                 (Get-Host).UI.RawUI.CursorSize = $originalCursorSize
                 return
@@ -3368,7 +4105,7 @@ function Search-BodyArmorsWithFilters {
         $script:bodyArmorFilters = @{ SelectedValues = @{}; SelectionMethod = @{} }
     }
     
-    $criterios = @("Alfabetico", "Peso", "Durabilidade", "Classe de Blindagem", "Material", "Penalidade de movimento", "Ergonomia", "Area Protegida")
+    $criterios = @("Alfabetico", "Peso", "Durabilidade", "Classe de Blindagem", "Penalidade de movimento", "Ergonomia", "Area Protegida")
     $materialMapDisplay = @{ "Aramid"="Aramida"; "Polyethylene"="Polietileno"; "Hardened Steel"="Aco endurecido"; "Composite"="Composto"; "Aluminum"="Aluminio"; "Titanium"="Titanio"; "Ceramic"="Ceramica" }
     $areaMapDisplay = @{ "Chest"="Torax"; "Chest, Upper Abdomen"="Torax, Abdomen Superior"; "Chest, Shoulder, Upper Abdomen"="Torax, Ombro, Abdomen Superior"; "Chest, Upper Abdomen, Lower Abdomen"="Torax, Abdomen Superior e Inferior"; "Chest, Shoulder, Upper Abdomen, Lower Abdomen"="Torax, Ombro, Abdomen Superior e Inferior" }
     do {
@@ -3424,14 +4161,14 @@ function Search-BodyArmorsWithFilters {
         Write-Host " " -NoNewline
         if ($criterioOrdenacao -eq "Durabilidade") { Write-Host ("{0,-7}" -f "Dur.") -ForegroundColor Green -NoNewline } else { Write-Host ("{0,-7}" -f "Dur.") -NoNewline }
         Write-Host " " -NoNewline
-        if ($criterioOrdenacao -eq "Material") { Write-Host ("{0,-15}" -f "Material") -ForegroundColor Green -NoNewline } else { Write-Host ("{0,-15}" -f "Material") -NoNewline }
+        Write-Host ("{0,-15}" -f "Material") -NoNewline
         Write-Host " " -NoNewline
         if ($criterioOrdenacao -eq "Penalidade de movimento") { Write-Host ("{0,-6}" -f "Vel.M") -ForegroundColor Green -NoNewline } else { Write-Host ("{0,-6}" -f "Vel.M") -NoNewline }
         Write-Host " " -NoNewline
         if ($criterioOrdenacao -eq "Ergonomia") { Write-Host ("{0,-6}" -f "Ergo") -ForegroundColor Green -NoNewline } else { Write-Host ("{0,-6}" -f "Ergo") -NoNewline }
         Write-Host " " -NoNewline
         if ($criterioOrdenacao -eq "Area Protegida") { Write-Host ("{0,-41}" -f "Area Protegida") -ForegroundColor Green } else { Write-Host ("{0,-41}" -f "Area Protegida") }
-        Write-Host "------------------------------------------ ------ -- ------- --------------- ------ ------ -----------------------------------------"
+        Write-Host "------------------------------------------ -----  -- -----   --------------  -----  -----  -----------------------------------------"
         foreach ($item in $sortedData) {
             $pesoFormatado = $item.Weight.ToString("F2", [System.Globalization.CultureInfo]::InvariantCulture)
             $durabilidadeFormatada = $item.Durability.ToString("F1", [System.Globalization.CultureInfo]::InvariantCulture)
@@ -3443,7 +4180,7 @@ function Search-BodyArmorsWithFilters {
             Write-Host " " -NoNewline
             Write-Host ("{0,-7}" -f $durabilidadeFormatada) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Durabilidade") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
             Write-Host " " -NoNewline
-            Write-Host ("{0,-15}" -f $item.Material) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Material") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
+            Write-Host ("{0,-15}" -f $item.Material) -NoNewline
             Write-Host " " -NoNewline
             Write-Host ("{0,-6}" -f $item.MovementSpeed) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Penalidade de movimento") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
             Write-Host " " -NoNewline
@@ -3453,18 +4190,18 @@ function Search-BodyArmorsWithFilters {
         }
         $key = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
         switch ($key.VirtualKeyCode) {
-            112 { # F1
+            112 {
                 $novoCriterio = Show-Menu -Title "Selecione o criterio" -Options $criterios -FlickerFree
                 (Get-Host).UI.RawUI.CursorSize = 0 
                 if ($novoCriterio) { 
                     $criterioOrdenacao = $novoCriterio
-                    if ($criterioOrdenacao -eq 'Alfabetico') { $ordemAtual = 'Crescente' } else { $ordemAtual = 'Decrescente' }
+                    $ordemAtual = 'Crescente'
                 }
             }
-            113 { # F2
+            113 {
                 $ordemAtual = if ($ordemAtual -eq "Decrescente") { "Crescente" } else { "Decrescente" }
             }
-            114 { # F3
+            114 {
                 $headerLayout = "  Classe de Blindagem        Area Protegida"
                 
                 $columnLabels = ($headerLayout -split '\s{2,}' | Where-Object {$_})
@@ -3484,11 +4221,11 @@ function Search-BodyArmorsWithFilters {
                 }
                 (Get-Host).UI.RawUI.CursorSize = 0
             }
-            115 { # F4
+            115 {
                 Show-BodyArmorLegend
                 continue
             }
-            116 { # F5
+            116 {
                 $script:bodyArmorFilters = @{ SelectedValues = @{}; SelectionMethod = @{} }
                 (Get-Host).UI.RawUI.CursorSize = $originalCursorSize
                 return
@@ -3501,21 +4238,74 @@ function Search-ArmoredRigsWithFilters {
     $originalCursorSize = (Get-Host).UI.RawUI.CursorSize
     (Get-Host).UI.RawUI.CursorSize = 0
     $criterioOrdenacao = "Alfabetico"
-    $ordemAtual = "Decrescente"
+    $ordemAtual = "Crescente"
     if (-not $script:armoredRigFilters) {
         $script:armoredRigFilters = @{ SelectedValues = @{}; SelectionMethod = @{} }
     }
-    $criterios = @("Alfabetico", "Peso", "Durabilidade", "Classe de Blindagem", "Material", "Penalidade de movimento", "Ergonomia", "Armazenamento", "Area Protegida")
+    $criterios = @(
+        "Alfabetico", 
+        "Peso", 
+        "Durabilidade", 
+        "Classe de Blindagem", 
+        "Penalidade de movimento", 
+        "Ergonomia", 
+        "Armazenamento", 
+        "Area Protegida",
+        "Conjunto de blocos (HxV)"
+    )
     $materialMapDisplay = @{ "Aramid"="Aramida"; "Polyethylene"="Polietileno"; "Hardened Steel"="Aco endurecido"; "Composite"="Composto"; "Aluminum"="Aluminio"; "Titanium"="Titanio"; "Ceramic"="Ceramica" }
     $areaMapDisplay = @{ "Chest"="Torax"; "Chest, Upper Abdomen"="Torax, Abdomen Sup."; "Chest, Upper Abdomen, Lower Abdomen"="Torax, Abd. Sup. e Inf."; "Chest, Shoulder, Upper Abdomen, Lower Abdomen"="Torax, Ombro, Abd. Sup. e Inf." }
     do {
-        $divisor =     "-------------------------------- ------ -- ------- --------------- ------ ------ ---  -------------------------------  --------------------"
+        $divisor =     "-------------------------------- -----  -- -----   --------------  -----  -----  ---  -------------------------------  --------------------"
         
         $armoredRigData = @()
         $itemFiles = Get-ChildItem -Path (Join-Path $global:databasePath "Armoredrigs") -Filter "*.txt" -File
         foreach ($file in $itemFiles) {
             $content = Get-Content -Path $file.FullName
             while ($content.Count -lt 9) { $content += "/////" }
+            
+            $maxBlockArea = 0
+            $countOfMaxBlock = 0
+
+            if ($content[8] -ne '/////') {
+                $parts = $content[8] -split ',\s*'
+                foreach ($part in $parts) {
+                    $count = 1
+                    $dims = $part
+                    
+                    if ($part -match '^\((\d+)\)(.+)') {
+                        $count = [int]$Matches[1]
+                        $dims = $Matches[2]
+                    }
+                    
+                    if ($dims -match '(\d+)x(\d+)') {
+                        $area = [int]$Matches[1] * [int]$Matches[2]
+                        
+                        if ($area -gt $maxBlockArea) {
+                            $maxBlockArea = $area
+                            $countOfMaxBlock = $count
+                        }
+                        elseif ($area -eq $maxBlockArea) {
+                            $countOfMaxBlock += $count
+                        }
+                    }
+                }
+            }
+            
+            $sortingScore = ($maxBlockArea * 1000) + $countOfMaxBlock
+
+            $movNum = 0
+            if ($content[4] -ne '/////') {
+                $cleanMov = $content[4] -replace '%', ''
+                $movNum = [int]$cleanMov
+            }
+
+            $ergoNum = 0
+            if ($content[5] -ne '/////') {
+                $cleanErgo = $content[5] -replace '%', ''
+                $ergoNum = [int]$cleanErgo
+            }
+
             $armoredRigData += [PSCustomObject]@{
                 Nome                 = $file.BaseName
                 Weight               = [double]$content[0]
@@ -3523,11 +4313,14 @@ function Search-ArmoredRigsWithFilters {
                 ArmorClass           = [int]$content[2]
                 Material             = $materialMapDisplay[$content[3]]
                 MovementSpeed        = $content[4]
+                MovementSpeedNum     = $movNum
                 Ergonomics           = $content[5]
+                ErgonomicsNum        = $ergoNum
                 Storage              = [int]$content[6]
                 ProtectedArea        = $areaMapDisplay[$content[7]]
                 ProtectedAreaRaw     = $content[7]
                 InternalLayout       = $content[8]
+                BlockSortingScore    = $sortingScore
             }
         }
         $filteredData = $armoredRigData
@@ -3541,7 +4334,54 @@ function Search-ArmoredRigsWithFilters {
                 }
             }
         }
-        $sortedData = Ordenar-ArmoredRigData -dados $filteredData -criterio $criterioOrdenacao
+        
+        $propriedadePrimaria = switch ($criterioOrdenacao) {
+            "Alfabetico"              { "Nome" }
+            "Peso"                    { "Weight" }
+            "Durabilidade"            { "Durability" }
+            "Classe de Blindagem"     { "ArmorClass" }
+            "Penalidade de movimento" { "MovementSpeedNum" }
+            "Ergonomia"               { "ErgonomicsNum" }
+            "Armazenamento"           { "Storage" }
+            "Area Protegida"          { "ProtectedArea" }
+            "Conjunto de blocos (HxV)" { "BlockSortingScore" }
+        }
+
+        $isDescending = $true 
+        if ($criterioOrdenacao -eq "Peso") { $isDescending = $false }
+        
+        $ordenacaoParams = @( @{ Expression = { $_."$propriedadePrimaria" }; Descending = $isDescending } )
+        switch ($criterioOrdenacao) {
+            "Armazenamento"  { 
+                $ordenacaoParams += @{ Expression = 'BlockSortingScore'; Descending = $true }
+                $ordenacaoParams += @{ Expression = 'ArmorClass'; Descending = $true }
+                $ordenacaoParams += @{ Expression = 'Durability'; Descending = $true }
+                $ordenacaoParams += @{ Expression = 'Weight'; Descending = $false }
+            }
+            "Peso"           { $ordenacaoParams += @{ Expression = 'ArmorClass'; Descending = $true }; $ordenacaoParams += @{ Expression = 'Durability'; Descending = $true } }
+            "Durabilidade"   { 
+                $ordenacaoParams += @{ Expression = 'ArmorClass'; Descending = $true }
+                $ordenacaoParams += @{ Expression = 'Weight'; Descending = $false }
+            }
+            "Classe de Blindagem" { 
+                $ordenacaoParams += @{ Expression = 'Durability'; Descending = $true }
+                $ordenacaoParams += @{ Expression = 'Weight'; Descending = $false }
+            }
+            "Penalidade de movimento" { $ordenacaoParams += @{ Expression = 'ArmorClass'; Descending = $true } }
+            "Ergonomia"      { 
+                $ordenacaoParams += @{ Expression = 'ArmorClass'; Descending = $true }
+                $ordenacaoParams += @{ Expression = 'Durability'; Descending = $true }
+                $ordenacaoParams += @{ Expression = 'Weight'; Descending = $false }
+            }
+            "Area Protegida" { $ordenacaoParams += @{ Expression = 'ArmorClass'; Descending = $true }; $ordenacaoParams += @{ Expression = 'Durability'; Descending = $true }; $ordenacaoParams += @{ Expression = 'Weight'; Descending = $false } }
+            "Conjunto de blocos (HxV)" {
+                $ordenacaoParams += @{ Expression = 'ArmorClass'; Descending = $true }
+                $ordenacaoParams += @{ Expression = 'Durability'; Descending = $true }
+            }
+        }
+
+        $sortedData = $filteredData | Sort-Object -Property $ordenacaoParams
+        
         if ($ordemAtual -eq "Crescente") { [array]::Reverse($sortedData) }
         
         Clear-Host
@@ -3562,7 +4402,7 @@ function Search-ArmoredRigsWithFilters {
         Write-Host " " -NoNewline
         if ($criterioOrdenacao -eq "Durabilidade") { Write-Host ("{0,-7}" -f "Dur.") -ForegroundColor Green -NoNewline } else { Write-Host ("{0,-7}" -f "Dur.") -NoNewline }
         Write-Host " " -NoNewline
-        if ($criterioOrdenacao -eq "Material") { Write-Host ("{0,-15}" -f "Material") -ForegroundColor Green -NoNewline } else { Write-Host ("{0,-15}" -f "Material") -NoNewline }
+        Write-Host ("{0,-15}" -f "Material") -NoNewline
         Write-Host " " -NoNewline
         if ($criterioOrdenacao -eq "Penalidade de movimento") { Write-Host ("{0,-6}" -f "Vel.M") -ForegroundColor Green -NoNewline } else { Write-Host ("{0,-6}" -f "Vel.M") -NoNewline }
         Write-Host " " -NoNewline
@@ -3572,11 +4412,34 @@ function Search-ArmoredRigsWithFilters {
         Write-Host " " -NoNewline
         if ($criterioOrdenacao -eq "Area Protegida") { Write-Host ("{0,-32}" -f "Area Protegida") -ForegroundColor Green -NoNewline } else { Write-Host ("{0,-32}" -f "Area Protegida") -NoNewline }
         Write-Host " " -NoNewline
-        Write-Host ("{0,-20}" -f "Conj d. blocos(HxV)")
+        if ($criterioOrdenacao -eq "Conjunto de blocos (HxV)") { Write-Host ("{0,-20}" -f "Conj d. blocos (HxV)") -ForegroundColor Green } else { Write-Host ("{0,-20}" -f "Conj d. blocos (HxV)") }
         Write-Host $divisor
         foreach ($item in $sortedData) {
             $pesoFormatado = $item.Weight.ToString("F2", [System.Globalization.CultureInfo]::InvariantCulture)
             $durabilidadeFormatada = $item.Durability.ToString("F1", [System.Globalization.CultureInfo]::InvariantCulture)
+            
+            $displayLayout = $item.InternalLayout
+            if ($item.InternalLayout -ne '/////') {
+                $layoutParts = $item.InternalLayout -split ',\s*'
+                $parsedLayout = @()
+                foreach ($part in $layoutParts) {
+                    if ($part -match '^\((\d+)\)(.+)') {
+                        $cnt = [int]$Matches[1]
+                        $dims = $Matches[2]
+                    } else {
+                        $cnt = 1
+                        $dims = $part
+                    }
+                    $area = 0
+                    if ($dims -match '(\d+)x(\d+)') {
+                        $area = [int]$Matches[1] * [int]$Matches[2]
+                    }
+                    $parsedLayout += [PSCustomObject]@{ Original = $part; Area = $area; Count = $cnt }
+                }
+                $sortedLayout = $parsedLayout | Sort-Object -Property @{e="Area"; Descending=$true}, @{e="Count"; Descending=$true}
+                $displayLayout = ($sortedLayout.Original) -join ', '
+            }
+
             Write-Host ("{0,-32}" -f $item.Nome) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Alfabetico") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
             Write-Host " " -NoNewline
             Write-Host ("{0,-6}" -f $pesoFormatado) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Peso") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
@@ -3585,7 +4448,7 @@ function Search-ArmoredRigsWithFilters {
             Write-Host " " -NoNewline
             Write-Host ("{0,-7}" -f $durabilidadeFormatada) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Durabilidade") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
             Write-Host " " -NoNewline
-            Write-Host ("{0,-15}" -f $item.Material) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Material") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
+            Write-Host ("{0,-15}" -f $item.Material) -NoNewline
             Write-Host " " -NoNewline
             Write-Host ("{0,-6}" -f $item.MovementSpeed) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Penalidade de movimento") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
             Write-Host " " -NoNewline
@@ -3595,22 +4458,22 @@ function Search-ArmoredRigsWithFilters {
             Write-Host " " -NoNewline
             Write-Host ("{0,-32}" -f $item.ProtectedArea) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Area Protegida") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
             Write-Host " " -NoNewline
-            Write-Host ("{0,-20}" -f $item.InternalLayout)
+            Write-Host ("{0,-20}" -f $displayLayout) -ForegroundColor $(if ($criterioOrdenacao -eq "Conjunto de blocos (HxV)") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
         }
         $key = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
         switch ($key.VirtualKeyCode) {
-            112 { # F1
+            112 { 
                 $novoCriterio = Show-Menu -Title "Selecione o criterio" -Options $criterios -FlickerFree
                 (Get-Host).UI.RawUI.CursorSize = 0
                 if ($novoCriterio) { 
                     $criterioOrdenacao = $novoCriterio
-                    if ($criterioOrdenacao -eq 'Alfabetico') { $ordemAtual = 'Crescente' } else { $ordemAtual = 'Decrescente' }
+                    $ordemAtual = 'Crescente'
                 }
             }
-            113 { # F2
+            113 { 
                 $ordemAtual = if ($ordemAtual -eq "Decrescente") { "Crescente" } else { "Decrescente" }
             }
-            114 { # F3
+            114 { 
                 $headerLayout = "  Classe de Blindagem        Area Protegida"
                 
                 $columnLabels = ($headerLayout -split '\s{2,}' | Where-Object {$_})
@@ -3624,16 +4487,16 @@ function Search-ArmoredRigsWithFilters {
                 
                 $updatedFilters = Show-ItemFilterScreen -Title "Filtro de Coletes Blindados" -AllItems $armoredRigData -FilterDefinitions $filterDefs -CurrentFilters $script:armoredRigFilters
                 if ($updatedFilters) {
-                    $script:armidRigFilters = $updatedFilters
+                    $script:armoredRigFilters = $updatedFilters
                 } else { 
                     $script:armoredRigFilters = @{ SelectedValues = @{}; SelectionMethod = @{} }
                 }
                 (Get-Host).UI.RawUI.CursorSize = 0
             }
-            115 { # F4
+            115 { 
                 Show-ArmoredRigLegend; continue
             }
-            116 { # F5
+            116 { 
                 $script:armoredRigFilters = @{ SelectedValues = @{}; SelectionMethod = @{} }
                 (Get-Host).UI.RawUI.CursorSize = $originalCursorSize; return
             }
@@ -3646,7 +4509,7 @@ function Search-MasksWithFilters {
     (Get-Host).UI.RawUI.CursorSize = 0
     $criterioOrdenacao = "Alfabetico"
     $ordemAtual = "Crescente"
-    $criterios = @("Alfabetico", "Peso", "Durabilidade", "Classe de Blindagem", "Material", "Chance de Ricochete")
+    $criterios = @("Alfabetico", "Peso", "Durabilidade", "Classe de Blindagem", "Chance de Ricochete")
     
     $materialMapDisplay = @{ "Glass"="Vidro"; "Hardened Steel"="Aco endurecido"; "Composite"="Composto"; "Aluminum"="Aluminio" }
     $ricocheteMapDisplay = @{ "Low"="Baixo"; "Medium"="Medio"; "High"="Alto" }
@@ -3688,11 +4551,11 @@ function Search-MasksWithFilters {
         Write-Host " " -NoNewline
         if ($criterioOrdenacao -eq "Classe de Blindagem") { Write-Host ("{0,-4}" -f "Cl") -ForegroundColor Green -NoNewline } else { Write-Host ("{0,-4}" -f "Cl") -NoNewline }
         Write-Host " " -NoNewline
-        if ($criterioOrdenacao -eq "Material") { Write-Host ("{0,-15}" -f "Material") -ForegroundColor Green -NoNewline } else { Write-Host ("{0,-15}" -f "Material") -NoNewline }
+        Write-Host ("{0,-15}" -f "Material") -NoNewline
         Write-Host " " -NoNewline
         if ($criterioOrdenacao -eq "Chance de Ricochete") { Write-Host ("{0,-19}" -f "Chance de Ricochete") -ForegroundColor Green } else { Write-Host ("{0,-19}" -f "Chance de Ricochete") }
         
-        Write-Host "------------------------------------   -----  -----  ---  --------------  -------------------"
+        Write-Host "------------------------------------   ----   ----   --   --------------  -------------------"
         foreach ($item in $sortedData) {
             $pesoFormatado = $item.Weight.ToString("F2", [System.Globalization.CultureInfo]::InvariantCulture)
             $durabilidadeFormatada = $item.Durability.ToString("F1", [System.Globalization.CultureInfo]::InvariantCulture)
@@ -3705,27 +4568,27 @@ function Search-MasksWithFilters {
             Write-Host " " -NoNewline
             Write-Host ("{0,-4}" -f $item.ArmorClass) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Classe de Blindagem") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
             Write-Host " " -NoNewline
-            Write-Host ("{0,-15}" -f $item.Material) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Material") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
+            Write-Host ("{0,-15}" -f $item.Material) -NoNewline
             Write-Host " " -NoNewline
             Write-Host ("{0,-19}" -f $item.RicochetChance) -ForegroundColor $(if ($criterioOrdenacao -eq "Chance de Ricochete") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
         }
         $key = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
         switch ($key.VirtualKeyCode) {
-            112 { # F1 - Mudar critério
+            112 {
                 $novoCriterio = Show-Menu -Title "Selecione o criterio" -Options $criterios -FlickerFree
-                (Get-Host).UI.RawUI.CursorSize = 0 # Garante que o cursor fique escondido
+                (Get-Host).UI.RawUI.CursorSize = 0
                 if ($novoCriterio) { 
                     $criterioOrdenacao = $novoCriterio
-                    if ($novoCriterio -eq 'Alfabetico' -or $novoCriterio -eq 'Peso') { $ordemAtual = 'Crescente' } else { $ordemAtual = 'Decrescente' } 
+                    $ordemAtual = 'Crescente'
                 }
             }
-            113 { # F2 - Mudar ordem
+            113 {
                 $ordemAtual = if ($ordemAtual -eq "Decrescente") { "Crescente" } else { "Decrescente" }
             }
-            114 { # F3 - Ver legenda
+            114 {
                 Show-MaskLegend; continue
             }
-            115 { # F4 - Voltar ao menu principal
+            115 {
                 (Get-Host).UI.RawUI.CursorSize = $originalCursorSize; return
             }
         }
@@ -3865,7 +4728,7 @@ function Search-HeadsetsWithFilters {
         Write-Host " " -NoNewline
         if ($criterioOrdenacao -eq "Reducao de Ruido") { Write-Host ("{0,-16}" -f "Reducao de Ruido") -ForegroundColor Green } else { Write-Host ("{0,-16}" -f "Reducao de Ruido") }
         
-        Write-Host "-------------------------------- -----  ---------------   ----------------"
+        Write-Host "-------------------------------  ----   ---------------   ----------------"
         foreach ($item in $sortedData) {
             $pesoFormatado = $item.Weight.ToString("F2", [System.Globalization.CultureInfo]::InvariantCulture)
             
@@ -3879,25 +4742,21 @@ function Search-HeadsetsWithFilters {
         }
         $key = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
         switch ($key.VirtualKeyCode) {
-            112 { # F1 - Mudar critério
+            112 {
                 $novoCriterio = Show-Menu -Title "Selecione o criterio" -Options $criterios -FlickerFree
-                (Get-Host).UI.RawUI.CursorSize = 0 # Garante que o cursor fique escondido
+                (Get-Host).UI.RawUI.CursorSize = 0
                 if ($novoCriterio) { 
                     $criterioOrdenacao = $novoCriterio
-                    if ($criterioOrdenacao -eq 'Alfabetico') {
-                        $ordemAtual = 'Crescente'
-                    } else {
-                        $ordemAtual = 'Decrescente'
-                    }
+                    $ordemAtual = 'Crescente'
                 }
             }
-            113 { # F2 - Mudar ordem
+            113 {
                 $ordemAtual = if ($ordemAtual -eq "Decrescente") { "Crescente" } else { "Decrescente" }
             }
-            114 { # F3 - Ver legenda
+            114 {
                 Show-HeadsetLegend; continue
             }
-            115 { # F4 - Voltar ao menu principal
+            115 {
                 (Get-Host).UI.RawUI.CursorSize = $originalCursorSize; return
             }
         }
@@ -3909,11 +4768,11 @@ function Search-UnarmoredRigsWithFilters {
     (Get-Host).UI.RawUI.CursorSize = 0
     $criterioOrdenacao = "Alfabetico"
     $ordemAtual = "Crescente"
-    $criterios = @("Alfabetico", "Peso", "Espaco", "+Espaco p/armaz -Espaco consumido")
+    $criterios = @("Alfabetico", "Peso", "Armazenamento", "Conjunto de blocos (HxV)", "+Espaco p/armaz -Espaco consumido")
     
     do {
-        $localHeader = "Nome do colete nao blindado                Peso   Espaco Desdobrada  Dobrada Conj d. blocos          +Armaz -Espaco"
-        $divisor =     "------------------------------------------ ------ ------ ---------- ------- ----------------------- --------------"
+        $localHeader = "Nome do colete nao blindado                Peso   Espaco Desdobrada  Dobrada Conj d. blocos (HxV)    +Armaz -Espaco"
+        $divisor =     "------------------------------------------ ----   ------ ---------- ------- ----------------------- --------------"
         
         $unarmoredRigData = @()
         $itemFiles = Get-ChildItem -Path (Join-Path $global:databasePath "Unarmoredrigs") -Filter "*.txt" -File
@@ -3927,18 +4786,44 @@ function Search-UnarmoredRigsWithFilters {
             }
             $setCount = 0
             $internalLayoutString = $content[4]
+            
+            $maxBlockArea = 0
+            $countOfMaxBlock = 0
+
             if ($internalLayoutString -ne '/////') {
                 $sets = $internalLayoutString -split ',\s*'
                 foreach ($set in $sets) {
+                    $cnt = 1
+                    $dims = $set
                     if ($set -match '^\((\d+)\)') {
-                        $setCount += [int]$Matches[1]
+                        $cnt = [int]$Matches[1]
+                        $setCount += $cnt
                     } else {
                         $setCount += 1
+                    }
+                    
+                    if ($set -match '^\((\d+)\)(.+)') {
+                        $cnt = [int]$Matches[1]
+                        $dims = $Matches[2]
+                    }
+                    
+                    if ($dims -match '(\d+)x(\d+)') {
+                        $area = [int]$Matches[1] * [int]$Matches[2]
+                        if ($area -gt $maxBlockArea) {
+                            $maxBlockArea = $area
+                            $countOfMaxBlock = $cnt
+                        }
+                        elseif ($area -eq $maxBlockArea) {
+                            $countOfMaxBlock += $cnt
+                        }
                     }
                 }
             } else {
                 $setCount = 999
             }
+            
+            $sortingScore = ($maxBlockArea * 1000) + $countOfMaxBlock
+
             $unarmoredRigData += [PSCustomObject]@{
                 Nome            = $file.BaseName
                 Weight          = [double]$content[0]
@@ -3948,11 +4833,41 @@ function Search-UnarmoredRigsWithFilters {
                 SizeFolded      = $content[3]
                 InternalLayout  = $content[4]
                 Efficiency      = $efficiency
-                SetCount        = $setCount # Nova propriedade adicionada
+                SetCount        = $setCount
+                BlockSortingScore = $sortingScore
             }
         }
         
-        $sortedData = Ordenar-UnarmoredRigData -dados $unarmoredRigData -criterio $criterioOrdenacao
+        $propriedadePrimaria = switch ($criterioOrdenacao) {
+            "Alfabetico" { "Nome" }
+            "Peso"       { "Weight" }
+            "Armazenamento" { "Storage" }
+            "Conjunto de blocos (HxV)" { "BlockSortingScore" }
+            "+Espaco p/armaz -Espaco consumido" { "Efficiency" }
+        }
+        
+        $isDescending = $true
+        if ($criterioOrdenacao -eq "Peso") { $isDescending = $false }
+        
+        $ordenacaoParams = @( @{ Expression = { $_."$propriedadePrimaria" }; Descending = $isDescending } )
+        switch ($criterioOrdenacao) {
+            "Peso"   { $ordenacaoParams += @{ Expression = 'Storage'; Descending = $true } }
+            "Armazenamento" { 
+                $ordenacaoParams += @{ Expression = 'BlockSortingScore'; Descending = $true }
+                $ordenacaoParams += @{ Expression = 'Efficiency'; Descending = $true }
+                $ordenacaoParams += @{ Expression = 'Weight'; Descending = $false }
+            }
+            "Conjunto de blocos (HxV)" {
+                $ordenacaoParams += @{ Expression = 'Storage'; Descending = $true }
+            }
+            "+Espaco p/armaz -Espaco consumido" { 
+                $ordenacaoParams += @{ Expression = 'Storage'; Descending = $true }
+                $ordenacaoParams += @{ Expression = 'SetCount'; Descending = $false }
+                $ordenacaoParams += @{ Expression = 'Weight'; Descending = $false }
+            }
+        }
+        
+        $sortedData = $unarmoredRigData | Sort-Object -Property $ordenacaoParams
         if ($ordemAtual -eq "Crescente") { [array]::Reverse($sortedData) }
         
         Clear-Host
@@ -3968,50 +4883,72 @@ function Search-UnarmoredRigsWithFilters {
         Write-Host " " -NoNewline
         if ($criterioOrdenacao -eq "Peso") { Write-Host ("{0,-6}" -f "Peso") -ForegroundColor Green -NoNewline } else { Write-Host ("{0,-6}" -f "Peso") -NoNewline }
         Write-Host " " -NoNewline
-        if ($criterioOrdenacao -eq "Espaco") { Write-Host ("{0,-6}" -f "Espaco") -ForegroundColor Green -NoNewline } else { Write-Host ("{0,-6}" -f "Espaco") -NoNewline }
+        if ($criterioOrdenacao -eq "Armazenamento") { Write-Host ("{0,-6}" -f "Espaco") -ForegroundColor Green -NoNewline } else { Write-Host ("{0,-6}" -f "Espaco") -NoNewline }
         Write-Host " " -NoNewline
         Write-Host ("{0,-10}" -f "Desdobrada") -NoNewline
         Write-Host " " -NoNewline
         Write-Host ("{0,-7}" -f "Dobrada") -NoNewline
         Write-Host " " -NoNewline
-        Write-Host ("{0,-23}" -f "Conj d. blocos") -NoNewline
+        if ($criterioOrdenacao -eq "Conjunto de blocos (HxV)") { Write-Host ("{0,-23}" -f "Conj d. blocos (HxV)") -ForegroundColor Green -NoNewline } else { Write-Host ("{0,-23}" -f "Conj d. blocos (HxV)") -NoNewline }
         Write-Host " " -NoNewline
         if ($criterioOrdenacao -eq "+Espaco p/armaz -Espaco consumido") { Write-Host ("{0,-14}" -f "+Armaz -Espaco") -ForegroundColor Green } else { Write-Host ("{0,-14}" -f "+Armaz -Espaco") }
         Write-Host $divisor
         foreach ($item in $sortedData) {
             $efficiencyDisplay = if($item.Efficiency -eq -9999) { "/////" } else { "{0:+#;-#;0}" -f $item.Efficiency }
             
+            $displayLayout = $item.InternalLayout
+            if ($item.InternalLayout -ne '/////') {
+                $layoutParts = $item.InternalLayout -split ',\s*'
+                $parsedLayout = @()
+                foreach ($part in $layoutParts) {
+                    if ($part -match '^\((\d+)\)(.+)') {
+                        $cnt = [int]$Matches[1]
+                        $dims = $Matches[2]
+                    } else {
+                        $cnt = 1
+                        $dims = $part
+                    }
+                    $area = 0
+                    if ($dims -match '(\d+)x(\d+)') {
+                        $area = [int]$Matches[1] * [int]$Matches[2]
+                    }
+                    $parsedLayout += [PSCustomObject]@{ Original = $part; Area = $area; Count = $cnt }
+                }
+                $sortedLayout = $parsedLayout | Sort-Object -Property @{e="Area"; Descending=$true}, @{e="Count"; Descending=$true}
+                $displayLayout = ($sortedLayout.Original) -join ', '
+            }
+
             Write-Host ("{0,-42}" -f $item.Nome) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Alfabetico") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
             Write-Host " " -NoNewline
             Write-Host ("{0,-6}" -f $item.WeightRaw) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Peso") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
             Write-Host " " -NoNewline
-            Write-Host ("{0,-6}" -f $item.Storage) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Espaco") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
+            Write-Host ("{0,-6}" -f $item.Storage) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Armazenamento") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
             Write-Host " " -NoNewline
             Write-Host ("{0,-10}" -f $item.SizeUnfolded) -NoNewline
             Write-Host " " -NoNewline
             Write-Host ("{0,-7}" -f $item.SizeFolded) -NoNewline
             Write-Host " " -NoNewline
-            Write-Host ("{0,-23}" -f $item.InternalLayout) -NoNewline
+            Write-Host ("{0,-23}" -f $displayLayout) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Conjunto de blocos (HxV)") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
             Write-Host " " -NoNewline
             Write-Host ("{0,-14}" -f $efficiencyDisplay) -ForegroundColor $(if ($criterioOrdenacao -eq "+Espaco p/armaz -Espaco consumido") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
         }
         $key = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
         switch ($key.VirtualKeyCode) {
-            112 { # F1 - Mudar critério
+            112 { 
                 $novoCriterio = Show-Menu -Title "Selecione o criterio" -Options $criterios -FlickerFree
                 (Get-Host).UI.RawUI.CursorSize = 0 
                 if ($novoCriterio) { 
                     $criterioOrdenacao = $novoCriterio
-                    if ($novoCriterio -eq 'Alfabetico') { $ordemAtual = 'Crescente' } else { $ordemAtual = 'Decrescente' } 
+                    $ordemAtual = 'Crescente' 
                 }
             }
-            113 { # F2 - Mudar ordem
+            113 { 
                 $ordemAtual = if ($ordemAtual -eq "Decrescente") { "Crescente" } else { "Decrescente" }
             }
-            114 { # F3 - Ver legenda
+            114 { 
                 Show-UnarmoredRigLegend; continue
             }
-            115 { # F4 - Voltar ao menu principal
+            115 { 
                 (Get-Host).UI.RawUI.CursorSize = $originalCursorSize; return
             }
         }
@@ -4023,12 +4960,11 @@ function Search-BackpacksWithFilters {
     (Get-Host).UI.RawUI.CursorSize = 0
     $criterioOrdenacao = "Alfabetico"
     $ordemAtual = "Crescente"
-    $criterios = @("Alfabetico", "Peso", "Espaco", "+Espaco p/armaz -Espaco consumido")
+    $criterios = @("Alfabetico", "Peso", "Armazenamento", "Conjunto de blocos (HxV)", "+Espaco p/armaz -Espaco consumido")
     
     do {
-        $localHeader = "Nome da mochila                      Peso   Espaco Desdobrada  Dobrada Conj d. blocos       +Armaz -Espaco"
-        $divisor =     "----------------------------------   -----  ------ ---------- ------- -------------------  --------------"
-        $localFormat = "{0,-36} {1,-6} {2,-6} {3,-11} {4,-7} {5,-20} {6,-14}"
+        $localHeader = "Nome da mochila                      Peso   Espaco Desdobrada  Dobrada Conj d. blocos (HxV) +Armaz -Espaco"
+        $divisor =     "----------------------------------   ----   ------ ---------- ------- -------------------- --------------"
         $backpackData = @()
         $itemFiles = Get-ChildItem -Path (Join-Path $global:databasePath "Backpacks") -Filter "*.txt" -File
         foreach ($file in $itemFiles) {
@@ -4041,18 +4977,44 @@ function Search-BackpacksWithFilters {
             }
             $setCount = 0
             $internalLayoutString = $content[4]
+            
+            $maxBlockArea = 0
+            $countOfMaxBlock = 0
+
             if ($internalLayoutString -ne '/////') {
                 $sets = $internalLayoutString -split ',\s*'
                 foreach ($set in $sets) {
+                    $cnt = 1
+                    $dims = $set
                     if ($set -match '^\((\d+)\)') {
-                        $setCount += [int]$Matches[1]
+                        $cnt = [int]$Matches[1]
+                        $setCount += $cnt
                     } else {
                         $setCount += 1
+                    }
+                    
+                    if ($set -match '^\((\d+)\)(.+)') {
+                        $cnt = [int]$Matches[1]
+                        $dims = $Matches[2]
+                    }
+                    
+                    if ($dims -match '(\d+)x(\d+)') {
+                        $area = [int]$Matches[1] * [int]$Matches[2]
+                        if ($area -gt $maxBlockArea) {
+                            $maxBlockArea = $area
+                            $countOfMaxBlock = $cnt
+                        }
+                        elseif ($area -eq $maxBlockArea) {
+                            $countOfMaxBlock += $cnt
+                        }
                     }
                 }
             } else {
                 $setCount = 999 
             }
+            
+            $sortingScore = ($maxBlockArea * 1000) + $countOfMaxBlock
+
             $backpackData += [PSCustomObject]@{
                 Nome            = $file.BaseName
                 Weight          = [double]$content[0]
@@ -4062,11 +5024,41 @@ function Search-BackpacksWithFilters {
                 SizeFolded      = $content[3]
                 InternalLayout  = $content[4]
                 Efficiency      = $efficiency
-                SetCount        = $setCount 
+                SetCount        = $setCount
+                BlockSortingScore = $sortingScore
             }
         }
         
-        $sortedData = Ordenar-BackpackData -dados $backpackData -criterio $criterioOrdenacao
+        $propriedadePrimaria = switch ($criterioOrdenacao) {
+            "Alfabetico" { "Nome" }
+            "Peso"       { "Weight" }
+            "Armazenamento" { "Storage" }
+            "Conjunto de blocos (HxV)" { "BlockSortingScore" }
+            "+Espaco p/armaz -Espaco consumido" { "Efficiency" }
+        }
+        
+        $isDescending = $true
+        if ($criterioOrdenacao -eq "Peso") { $isDescending = $false }
+        
+        $ordenacaoParams = @( @{ Expression = { $_."$propriedadePrimaria" }; Descending = $isDescending } )
+        switch ($criterioOrdenacao) {
+            "Peso"   { $ordenacaoParams += @{ Expression = 'Storage'; Descending = $true } }
+            "Armazenamento" { 
+                $ordenacaoParams += @{ Expression = 'BlockSortingScore'; Descending = $true }
+                $ordenacaoParams += @{ Expression = 'SizeUnfolded'; Descending = $false }
+                $ordenacaoParams += @{ Expression = 'Efficiency'; Descending = $true }
+            }
+            "Conjunto de blocos (HxV)" {
+                $ordenacaoParams += @{ Expression = 'Storage'; Descending = $true }
+            }
+            "+Espaco p/armaz -Espaco consumido" { 
+                $ordenacaoParams += @{ Expression = 'Storage'; Descending = $true }
+                $ordenacaoParams += @{ Expression = 'SetCount'; Descending = $false }
+                $ordenacaoParams += @{ Expression = 'Weight'; Descending = $false }
+            }
+        }
+        
+        $sortedData = $backpackData | Sort-Object -Property $ordenacaoParams
         if ($ordemAtual -eq "Crescente") { [array]::Reverse($sortedData) }
         
         Clear-Host
@@ -4082,13 +5074,13 @@ function Search-BackpacksWithFilters {
         Write-Host " " -NoNewline
         if ($criterioOrdenacao -eq "Peso") { Write-Host ("{0,-6}" -f "Peso") -ForegroundColor Green -NoNewline } else { Write-Host ("{0,-6}" -f "Peso") -NoNewline }
         Write-Host " " -NoNewline
-        if ($criterioOrdenacao -eq "Espaco") { Write-Host ("{0,-6}" -f "Espaco") -ForegroundColor Green -NoNewline } else { Write-Host ("{0,-6}" -f "Espaco") -NoNewline }
+        if ($criterioOrdenacao -eq "Armazenamento") { Write-Host ("{0,-6}" -f "Espaco") -ForegroundColor Green -NoNewline } else { Write-Host ("{0,-6}" -f "Espaco") -NoNewline }
         Write-Host " " -NoNewline
         Write-Host ("{0,-10}" -f "Desdobrada") -NoNewline
         Write-Host " " -NoNewline
         Write-Host ("{0,-7}" -f "Dobrada") -NoNewline
         Write-Host " " -NoNewline
-        Write-Host ("{0,-20}" -f "Conj d. blocos") -NoNewline
+        if ($criterioOrdenacao -eq "Conjunto de blocos (HxV)") { Write-Host ("{0,-20}" -f "Conj d. blocos (HxV)") -ForegroundColor Green -NoNewline } else { Write-Host ("{0,-20}" -f "Conj d. blocos (HxV)") -NoNewline }
         Write-Host " " -NoNewline
         if ($criterioOrdenacao -eq "+Espaco p/armaz -Espaco consumido") { Write-Host ("{0,-14}" -f "+Armaz -Espaco") -ForegroundColor Green } else { Write-Host ("{0,-14}" -f "+Armaz -Espaco") }
         
@@ -4096,37 +5088,59 @@ function Search-BackpacksWithFilters {
         foreach ($item in $sortedData) {
             $efficiencyDisplay = if($item.Efficiency -eq -9999) { "/////" } else { "{0:+#;-#;0}" -f $item.Efficiency }
             
+            $displayLayout = $item.InternalLayout
+            if ($item.InternalLayout -ne '/////') {
+                $layoutParts = $item.InternalLayout -split ',\s*'
+                $parsedLayout = @()
+                foreach ($part in $layoutParts) {
+                    if ($part -match '^\((\d+)\)(.+)') {
+                        $cnt = [int]$Matches[1]
+                        $dims = $Matches[2]
+                    } else {
+                        $cnt = 1
+                        $dims = $part
+                    }
+                    $area = 0
+                    if ($dims -match '(\d+)x(\d+)') {
+                        $area = [int]$Matches[1] * [int]$Matches[2]
+                    }
+                    $parsedLayout += [PSCustomObject]@{ Original = $part; Area = $area; Count = $cnt }
+                }
+                $sortedLayout = $parsedLayout | Sort-Object -Property @{e="Area"; Descending=$true}, @{e="Count"; Descending=$true}
+                $displayLayout = ($sortedLayout.Original) -join ', '
+            }
+
             Write-Host ("{0,-36}" -f $item.Nome) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Alfabetico") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
             Write-Host " " -NoNewline
             Write-Host ("{0,-6}" -f $item.WeightRaw) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Peso") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
             Write-Host " " -NoNewline
-            Write-Host ("{0,-6}" -f $item.Storage) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Espaco") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
+            Write-Host ("{0,-6}" -f $item.Storage) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Armazenamento") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
             Write-Host " " -NoNewline
             Write-Host ("{0,-10}" -f $item.SizeUnfolded) -NoNewline
             Write-Host " " -NoNewline
             Write-Host ("{0,-7}" -f $item.SizeFolded) -NoNewline
             Write-Host " " -NoNewline
-            Write-Host ("{0,-20}" -f $item.InternalLayout) -NoNewline
+            Write-Host ("{0,-20}" -f $displayLayout) -NoNewline -ForegroundColor $(if ($criterioOrdenacao -eq "Conjunto de blocos (HxV)") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
             Write-Host " " -NoNewline
             Write-Host ("{0,-14}" -f $efficiencyDisplay) -ForegroundColor $(if ($criterioOrdenacao -eq "+Espaco p/armaz -Espaco consumido") { 'Green' } else { $Host.UI.RawUI.ForegroundColor })
         }
         $key = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
         switch ($key.VirtualKeyCode) {
-            112 { # F1 - Mudar critério
+            112 { 
                 $novoCriterio = Show-Menu -Title "Selecione o criterio" -Options $criterios -FlickerFree
-                (Get-Host).UI.RawUI.CursorSize = 0
+                (Get-Host).UI.RawUI.CursorSize = 0 
                 if ($novoCriterio) { 
                     $criterioOrdenacao = $novoCriterio
-                    if ($novoCriterio -eq 'Alfabetico') { $ordemAtual = 'Crescente' } else { $ordemAtual = 'Decrescente' } 
+                    $ordemAtual = 'Crescente' 
                 }
             }
-            113 { # F2 - Mudar ordem
+            113 { 
                 $ordemAtual = if ($ordemAtual -eq "Decrescente") { "Crescente" } else { "Decrescente" }
             }
-            114 { # F3 - Ver legenda
+            114 { 
                 Show-BackpackLegend; continue
             }
-            115 { # F4 - Voltar ao menu principal
+            115 { 
                 (Get-Host).UI.RawUI.CursorSize = $originalCursorSize; return
             }
         }
@@ -4134,143 +5148,243 @@ function Search-BackpacksWithFilters {
 }
 
 function Compare-Weapons {
-    $poderFogoMap = @{ "Low" = 1; "Mid-Low" = 2; "Medium" = 3; "Mid-High" = 4; "High" = 5 }
-    $canoMap = @{ "FB D-" = 1; "Custom" = 2; "FB" = 3; "FB D+" = 4; "Default +" = 5; "R+" = 6; "D+" = 6; "D+ R+" = 7 }
-    :mainCompareLoop while ($true) {
-        $weaponCountSelection = Show-Menu -Title "Comparar Armas" -Options @("2", "3") -PromptText "Voce gostaria de comparar quantas armas?" -FlickerFree -EnableF1BackButton
-        
-        if (-not $weaponCountSelection -or $weaponCountSelection -eq $global:ACTION_BACK) { return }
-        $weaponCount = [int]$weaponCountSelection
-        $selectedWeapons = @()
-        $alreadySelectedNames = @()
+    $poderFogoMap = @{ "Low"=1; "Mid-Low"=2; "Medium"=3; "Mid-High"=4; "High"=5 }
+    $canoMap = @{ "FB D-"=1; "Custom"=2; "FB"=2; "FB D+"=4; "Default +"=5; "R+"=6; "D+"=6; "D+ R+"=7 }
+    $modoMap = @{
+        "Pump-Action"=1; "Bolt-Action"=1
+        "3-RB"=2
+        "Semi"=3; "Semi, 3-RB"=3
+        "Full"=4; "Semi, Full"=4; "2-RB, Semi, Full"=4; "3-RB, Semi, Full"=4
+    }
 
-        for ($i = 1; $i -le $weaponCount; $i++) {
-            $weaponFile = $null
-            while (-not $weaponFile) {
-                $weaponFile = Select-WeaponForComparison -Title "Comparar Armas ($i/$weaponCount)" -Prompt "Selecione a $($i) ARMA" -ExcludedNames $alreadySelectedNames
-                if ($weaponFile -eq $global:ACTION_BACK) { continue mainCompareLoop }
-            }
-            $selectedWeapons += $weaponFile
-            $alreadySelectedNames += $weaponFile.BaseName
+    while ($true) {
+        $modeSelection = Show-Menu -Title "Modo de Comparacao e Analise" -Options @("Comparacao Basica", "Comparacao Avancada") -FlickerFree -EnableF1BackButton
+        
+        if ($modeSelection -eq $global:ACTION_BACK -or -not $modeSelection) { return }
+
+        if ($modeSelection -eq "Comparacao Avancada") {
+            Search-AdvancedWithFilters
+            continue 
         }
-        
-        $weaponDataArray = @()
-        foreach ($weapon in $selectedWeapons) {
-            $content = Get-Content -Path $weapon.FullName
-            
-            if ($content.Count -ge 13) {
-                $estabilidadeArmaValue = 0
-                if ($content.Count -ge 14) {
-                    $estabilidadeArmaValue = [int]$content[13]
-                }
-                $weaponDataArray += [PSCustomObject]@{
-                    Nome             = $weapon.BaseName
-                    Classe           = $content[0]
-                    Calibre          = $content[1]
-                    VerticalRecoil   = [int]$content[2]
-                    HorizontalRecoil = [int]$content[3]
-                    Ergonomia        = [int]$content[4]
-                    EstabilidadeArma = $estabilidadeArmaValue
-                    Precisao         = [int]$content[5]
-                    Estabilidade     = [int]$content[6]
-                    Alcance          = [int]$content[7]
-                    Velocidade       = [int]$content[8]
-                    ModoDisparo      = $content[9]
-                    Cadencia         = [int]$content[10]
-                    PoderFogo        = $content[11]
-                    Cano             = $content[12]
-                }
-            }
-        }
-        
-        (Get-Host).UI.RawUI.CursorSize = 0
-        Clear-Host
-        Write-Host "=== Tela de Comparacao ==="; Write-Host
-        
-        $columnWidth = -28
-        $headerLine = "{0,-30}" -f "Atributo"
-        $dividerLine = "{0,-30}" -f "------------------------------"
-        
-        foreach ($weaponData in $weaponDataArray) {
-            $headerLine += " {0,$columnWidth}" -f $weaponData.Nome
-            $dividerLine += " {0,$columnWidth}" -f ("-" * 28)
-        }
-        Write-Host $headerLine
-        Write-Host $dividerLine
-        
-        $attributes = @(
-            @{ Label = "Nome da Arma"; Prop = "Nome" },
-            @{ Label = "Calibre"; Prop = "Calibre" },
-            @{ Label = "Controle de recuo vertical"; Prop = "VerticalRecoil" },
-            @{ Label = "Controle de recuo horizontal"; Prop = "HorizontalRecoil" },
-            @{ Label = "Ergonomia"; Prop = "Ergonomia" },
-            @{ Label = "Estabilidade de arma"; Prop = "EstabilidadeArma" },
-            @{ Label = "Precisao"; Prop = "Precisao" },
-            @{ Label = "Estabilidade sem mirar"; Prop = "Estabilidade" },
-            @{ Label = "Distancia Efetiva"; Prop = "Alcance" },
-            @{ Label = "Velocidade de Saida"; Prop = "Velocidade" },
-            @{ Label = "Modo de disparo"; Prop = "ModoDisparo" },
-            @{ Label = "Cadencia"; Prop = "Cadencia" },
-            @{ Label = "Poder de fogo"; Prop = "PoderFogo" },
-            @{ Label = "Melhoria de cano"; Prop = "Cano" }
-        )
-        foreach ($attr in $attributes) {
-            $values = $weaponDataArray | ForEach-Object { $_.($attr.Prop) }
-            $comparableValues = $values
-            
-            $isNumeric = $false
-            if ($attr.Prop -notin "Nome", "Calibre", "ModoDisparo") {
-                $isNumeric = $true
-                if ($attr.Prop -eq "PoderFogo") { $comparableValues = $values | ForEach-Object { $poderFogoMap[$_] } }
-                if ($attr.Prop -eq "Cano") { $comparableValues = $values | ForEach-Object { $canoMap[$_] } }
-            }
-            $maxVal = $null; $minVal = $null
-            if ($isNumeric) {
-                $numericValues = $comparableValues | Where-Object { $_ -ne $null }
-                if ($numericValues) {
-                    $sorted = $numericValues | Sort-Object
-                    $minVal = $sorted[0]
-                    $maxVal = $sorted[-1]
-                }
-            }
-            Write-Host ("{0,-30}" -f $attr.Label) -NoNewline
-            
-            for ($i = 0; $i -lt $weaponDataArray.Count; $i++) {
-                $val = $values[$i]
-                $comparableVal = $comparableValues[$i]
-                $color = $Host.UI.RawUI.ForegroundColor
-                if ($isNumeric -and $maxVal -ne $minVal) {
-                    if ($comparableVal -eq $maxVal) { $color = "Green" }
-                    if ($comparableVal -eq $minVal) { $color = "Red" }
-                }
-                if ($attr.Prop -in @("PoderFogo", "Cano", "ModoDisparo")) {
-                    $tempVal = switch ($val) { "Low"{"Baixo"};"Mid-Low"{"Medio-Baixo"};"Medium"{"Medio"};"Mid-High"{"Medio-Alto"};"High"{"Alto"};"Default +"{ "Padrao +" };"FB"{"CF"};"R+"{"A+"};"FB D+"{"CF D+"};"FB D-"{"CF D-"};"D+ R+"{"D+ A+"};default{$val} }
-                    $val = $tempVal.Replace('Bolt-Action', 'A.Ferrolho').Replace('Pump-Action', 'A.Bombeamento').Replace('Full', 'Auto')
+
+        if ($modeSelection -eq "Comparacao Basica") {
+            :basicCompareLoop while ($true) {
+                $weaponCountSelection = Show-Menu -Title "Comparacao Basica" -Options @("2", "3") -PromptText "Voce gostaria de comparar quantas armas?" -FlickerFree -EnableF1BackButton
+                
+                if (-not $weaponCountSelection -or $weaponCountSelection -eq $global:ACTION_BACK) { break }
+                $weaponCount = [int]$weaponCountSelection
+                $selectedWeapons = @()
+                $alreadySelectedNames = @()
+
+                for ($i = 1; $i -le $weaponCount; $i++) {
+                    $weaponFile = $null
+                    while (-not $weaponFile) {
+                        $weaponFile = Select-WeaponForComparison -Title "Selecionar Arma ($i/$weaponCount)" -Prompt "Selecione a $($i) ARMA" -ExcludedNames $alreadySelectedNames
+                        if ($weaponFile -eq $global:ACTION_BACK) { continue basicCompareLoop }
+                    }
+                    $selectedWeapons += $weaponFile
+                    $alreadySelectedNames += $weaponFile.BaseName
                 }
                 
-                Write-Host (" {0,$columnWidth}" -f $val) -ForegroundColor $color -NoNewline
+                $weaponDataArray = @()
+                foreach ($weapon in $selectedWeapons) {
+                    $content = Get-Content -Path $weapon.FullName
+                    
+                    if ($content.Count -ge 13) {
+                        $estabilidadeArmaValue = if ($content.Count -ge 14) { [int]$content[13] } else { 0 }
+                        
+                        $modoDisp = $content[9]
+                        $modoDisplay = $modoDisp.Replace('Bolt-Action', 'A.Ferrolho').Replace('Pump-Action', 'A.Bombeamento').Replace('Full', 'Auto')
+                        $pfDisplay = if ($content[11] -in $poderFogoMap.Keys) { 
+                            switch ($content[11]) { "Low"{"Baixo"}; "Mid-Low"{"Medio-Baixo"}; "Medium"{"Medio"}; "Mid-High"{"Medio-Alto"}; "High"{"Alto"}; default{$content[11]} }
+                        } else { $content[11] }
+                        $canoDisplay = if ($canoMap.ContainsKey($content[12])) { 
+                            switch ($content[12]) { "Default +"{"Padrao +"}; "FB"{"CF"}; "R+"{"A+"}; "FB D+"{"CF D+"}; "FB D-"{"CF D-"}; "D+ R+"{"D+ A+"}; default{$content[12]} }
+                        } else { $content[12] }
+
+                        $pfNum = if ($poderFogoMap.ContainsKey($content[11])) { $poderFogoMap[$content[11]] } else { 0 }
+                        $cnNum = if ($canoMap.ContainsKey($content[12])) { $canoMap[$content[12]] } else { 0 }
+                        $mdNum = if ($modoMap.ContainsKey($modoDisp)) { $modoMap[$modoDisp] } else { 0 }
+
+                        $weaponDataArray += [PSCustomObject]@{
+                            Nome             = $weapon.BaseName
+                            Classe           = $content[0]
+                            Calibre          = $content[1]
+                            VerticalRecoil   = [int]$content[2]
+                            HorizontalRecoil = [int]$content[3]
+                            Ergonomia        = [int]$content[4]
+                            EstabilidadeArma = $estabilidadeArmaValue
+                            Precisao         = [int]$content[5]
+                            Estabilidade     = [int]$content[6]
+                            Alcance          = [int]$content[7]
+                            Velocidade       = [int]$content[8]
+                            ModoDisparo      = $modoDisplay
+                            ModoDisparoNum   = $mdNum
+                            Cadencia         = [int]$content[10]
+                            PoderFogo        = $pfDisplay
+                            PoderFogoNum     = $pfNum
+                            Cano             = $canoDisplay
+                            CanoNum          = $cnNum
+                        }
+                    }
+                }
+                
+                $stats = @{}
+                $propsToMeasure = @("VerticalRecoil", "HorizontalRecoil", "Ergonomia", "EstabilidadeArma", "Precisao", "Estabilidade", "Alcance", "Velocidade", "ModoDisparoNum", "Cadencia", "PoderFogoNum", "CanoNum")
+                
+                foreach ($p in $propsToMeasure) {
+                    $stats[$p] = $weaponDataArray | Measure-Object -Property $p -Minimum -Maximum
+                }
+
+                (Get-Host).UI.RawUI.CursorSize = 0
+                Clear-Host
+                Write-Host "=== Tela de Comparacao ==="; Write-Host
+                
+                $columnWidth = -28
+                $headerLine = "{0,-30}" -f "Atributo"
+                $dividerLine = "{0,-30}" -f "------------------------------"
+                
+                foreach ($weaponData in $weaponDataArray) {
+                    $headerLine += " {0,$columnWidth}" -f $weaponData.Nome
+                    $dividerLine += " {0,$columnWidth}" -f ("-" * 28)
+                }
+                Write-Host $headerLine
+                Write-Host $dividerLine
+                
+                $attributes = @(
+                    @{ Label = "Nome da Arma";                 Prop = "Nome";             IsNumeric = $false },
+                    @{ Label = "Calibre";                      Prop = "Calibre";          IsNumeric = $false },
+                    @{ Label = "Controle de recuo vertical";   Prop = "VerticalRecoil";   IsNumeric = $true; NumProp = "VerticalRecoil" },
+                    @{ Label = "Controle de recuo horizontal"; Prop = "HorizontalRecoil"; IsNumeric = $true; NumProp = "HorizontalRecoil" },
+                    @{ Label = "Ergonomia";                    Prop = "Ergonomia";        IsNumeric = $true; NumProp = "Ergonomia" },
+                    @{ Label = "Estabilidade de arma";         Prop = "EstabilidadeArma"; IsNumeric = $true; NumProp = "EstabilidadeArma" },
+                    @{ Label = "Precisao";                     Prop = "Precisao";         IsNumeric = $true; NumProp = "Precisao" },
+                    @{ Label = "Estabilidade sem mirar";       Prop = "Estabilidade";     IsNumeric = $true; NumProp = "Estabilidade" },
+                    @{ Label = "Distancia Efetiva";            Prop = "Alcance";          IsNumeric = $true; NumProp = "Alcance" },
+                    @{ Label = "Velocidade de Saida";          Prop = "Velocidade";       IsNumeric = $true; NumProp = "Velocidade" },
+                    @{ Label = "Modo de disparo";              Prop = "ModoDisparo";      IsNumeric = $true; NumProp = "ModoDisparoNum" },
+                    @{ Label = "Cadencia";                     Prop = "Cadencia";         IsNumeric = $true; NumProp = "Cadencia" },
+                    @{ Label = "Poder de fogo";                Prop = "PoderFogo";        IsNumeric = $true; NumProp = "PoderFogoNum" },
+                    @{ Label = "Melhoria de cano";             Prop = "Cano";             IsNumeric = $true; NumProp = "CanoNum" }
+                )
+
+                foreach ($attr in $attributes) {
+                    Write-Host ("{0,-30}" -f $attr.Label) -NoNewline
+                    
+                    for ($i = 0; $i -lt $weaponDataArray.Count; $i++) {
+                        $item = $weaponDataArray[$i]
+                        $valDisplay = $item.($attr.Prop)
+                        $color = $Host.UI.RawUI.ForegroundColor
+                        
+                        if ($attr.IsNumeric) {
+                            $valNum = $item.($attr.NumProp)
+                            $st = $stats[$attr.NumProp]
+                            
+                            if ($st.Minimum -ne $st.Maximum) {
+                                if ($valNum -eq $st.Maximum) { $color = "Green" }
+                                elseif ($valNum -eq $st.Minimum) { $color = "Red" }
+                            }
+                        }
+                        
+                        Write-Host (" {0,$columnWidth}" -f $valDisplay) -ForegroundColor $color -NoNewline
+                    }
+                    Write-Host
+                }
+
+                Write-Host
+                $uniqueCalibers = $weaponDataArray.Calibre | Sort-Object -Unique
+                
+                foreach ($caliber in $uniqueCalibers) {
+                    $weaponNames = ($weaponDataArray | Where-Object { $_.Calibre -eq $caliber }).Nome -join ' / '
+                    Write-Host ("--- MUNICOES PARA {0} ({1}) ---" -f $weaponNames, $caliber) -ForegroundColor Cyan
+                    
+                    $ammoFiles = Get-ChildItem -Path (Join-Path $AmmoPath $caliber) -Filter "*.txt" -File -ErrorAction SilentlyContinue
+                    
+                    if ($ammoFiles) {
+                        $caliberAmmoList = @()
+                        foreach ($f in $ammoFiles) {
+                            $c = Get-Content $f.FullName
+                            if ($c.Count -ge 9) {
+                                $chanceDisp = switch($c[8]){'Low'{'Baixo'};'Medium'{'Medio'};'High'{'Alto'};default{'//////'}}
+                                $chanceNum = switch($c[8]){'Low'{1};'Medium'{2};'High'{3};default{0}}
+                                $danoBaseNum = if($c[2]-match'\((\d+)\)'){[int]$Matches[1]}else{[int]($c[2]-replace'[^\d]','')}
+                                
+                                $caliberAmmoList += [PSCustomObject]@{
+                                    Nome=$f.BaseName; Calibre=$caliber
+                                    Level=[int]$c[0]; Penetracao=[int]$c[1]
+                                    DanoBase=$c[2]; DanoBaseNum=$danoBaseNum
+                                    DanoArmadura=[int]$c[3]
+                                    Velocidade=[int]$c[4]; Precisao=[int]$c[5]
+                                    RecuoVert=[int]$c[6]; RecuoHoriz=[int]$c[7]
+                                    Wound=$chanceDisp; WoundNum=$chanceNum
+                                }
+                            }
+                        }
+
+                        $caliberAmmoList = $caliberAmmoList | Sort-Object Level, DanoBaseNum, Penetracao -Descending
+                        
+                        $statsA = @{}
+                        $propsA = @("Level", "Penetracao", "DanoBaseNum", "DanoArmadura", "Velocidade", "Precisao", "RecuoVert", "RecuoHoriz", "WoundNum")
+                        if ($caliberAmmoList.Count -gt 0) { 
+                            foreach ($p in $propsA) { $statsA[$p] = $caliberAmmoList | Measure-Object -Property $p -Minimum -Maximum } 
+                        }
+
+                        Write-Host "Nome da Municao       Lv Pen Dano Base      Dano blindag Vel(m/s) Prec CRV CRH Chance Ferir  Calibre"
+                        Write-Host "-------------------   -- --- -------------  ------------ -------- ---- --- --- ------------  ---------"
+
+                        foreach ($a in $caliberAmmoList) {
+                            Write-Host ("{0,-19}" -f $a.Nome) -NoNewline
+                            Write-Host "   " -NoNewline
+
+                            $colsAmmo = @(
+                                @{ Disp=$a.Level;        Num=$a.Level;        Prop="Level";        W=2;  LowerBest=$false },
+                                @{ Disp=$a.Penetracao;   Num=$a.Penetracao;   Prop="Penetracao";   W=3;  LowerBest=$false; Space=" " },
+                                @{ Disp=$a.DanoBase;     Num=$a.DanoBaseNum;  Prop="DanoBaseNum";  W=14; LowerBest=$false; Space=" " },
+                                @{ Disp=$a.DanoArmadura; Num=$a.DanoArmadura; Prop="DanoArmadura"; W=12; LowerBest=$false; Space=" " },
+                                @{ Disp=$a.Velocidade;   Num=$a.Velocidade;   Prop="Velocidade";   W=8;  LowerBest=$false; Space=" " },
+                                @{ Disp=$a.Precisao;     Num=$a.Precisao;     Prop="Precisao";     W=4;  LowerBest=$false; Space=" " },
+                                @{ Disp=$a.RecuoVert;    Num=$a.RecuoVert;    Prop="RecuoVert";    W=3;  LowerBest=$false; Space=" " },
+                                @{ Disp=$a.RecuoHoriz;   Num=$a.RecuoHoriz;   Prop="RecuoHoriz";   W=3;  LowerBest=$false; Space=" " },
+                                @{ Disp=$a.Wound;        Num=$a.WoundNum;     Prop="WoundNum";     W=12; LowerBest=$false; Space=" " }
+                            )
+
+                            foreach ($c in $colsAmmo) {
+                                if ($c.Space) { Write-Host $c.Space -NoNewline }
+                                
+                                $st = $statsA[$c.Prop]
+                                $color = $Host.UI.RawUI.ForegroundColor
+                                
+                                if ($st.Minimum -ne $st.Maximum) {
+                                    if ($c.LowerBest) {
+                                        if ($c.Num -eq $st.Minimum) { $color = "Green" } elseif ($c.Num -eq $st.Maximum) { $color = "Red" }
+                                    } else {
+                                        if ($c.Num -eq $st.Maximum) { $color = "Green" } elseif ($c.Num -eq $st.Minimum) { $color = "Red" }
+                                    }
+                                }
+                                Write-Host ("{0,-$($c.W)}" -f $c.Disp) -NoNewline -ForegroundColor $color
+                            }
+                            Write-Host "  " -NoNewline
+                            Write-Host ("{0,-9}" -f $a.Calibre)
+                        }
+                    } else {
+                        Write-Host "Nenhuma municao encontrada para este calibre." -ForegroundColor Yellow
+                    }
+                    Write-Host
+                }
+
+                Write-Host "Pressione " -NoNewline
+                Write-Host "F1" -ForegroundColor Blue -NoNewline
+                Write-Host " para comparar outras armas ou " -NoNewline
+                Write-Host "F2" -ForegroundColor Red -NoNewline
+                Write-Host " para voltar ao menu..."
+                
+                do {
+                    $key = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown").VirtualKeyCode
+                } while ($key -ne 112 -and $key -ne 113)
+                
+                if ($key -eq 113) { break }
             }
-            Write-Host
         }
-        Write-Host
-        $uniqueCalibers = $weaponDataArray.Calibre | Sort-Object -Unique
-        foreach ($caliber in $uniqueCalibers) {
-            $weaponNames = ($weaponDataArray | Where-Object { $_.Calibre -eq $caliber }).Nome -join ' / '
-            Write-Host ("--- MUNICOES PARA {0} ({1}) ---" -f $weaponNames, $caliber)
-            Show-AmmoTableForCaliber -Caliber $caliber
-            Write-Host
-        }
-        Write-Host "Pressione " -NoNewline
-        Write-Host "F1" -ForegroundColor Blue -NoNewline
-        Write-Host " para comparar outras armas ou " -NoNewline
-        Write-Host "F2" -ForegroundColor Red -NoNewline
-        Write-Host " para voltar ao menu..."
-        
-        do {
-            $key = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown").VirtualKeyCode
-        } while ($key -ne 112 -and $key -ne 113)
-        
-        if ($key -eq 113) { return }
     }
 }
 
@@ -6419,16 +7533,31 @@ function Edit-MaskCompatibility {
     }
 }
 
+function Show-AnalysisMenu {
+    do {
+        $analysisOptions = @(
+            "Comparar armas",
+            "Consultar compatibilidade de mascaras e capacetes"
+        )
+        
+        $selection = Show-Menu -Title "Comparacao e Compatibilidade" -Options $analysisOptions -FlickerFree -EnableF1BackButton
+        
+        if ($selection -eq $global:ACTION_BACK) { return }
+        switch ($selection) {
+            "Comparar armas"                                    { Compare-Weapons }
+            "Consultar compatibilidade de mascaras e capacetes" { List-MaskCompatibility }
+        }
+    } while ($true)
+}
+
 function Show-ConsultasMenu {
     do {
         $consultasOptions = @(
             "Busca de Armas",
             "Busca de Municao",
-            "Comparar armas",
             "Busca de Granadas",
             "Busca de Capacetes",
             "Busca de Mascaras",
-            "Consultar compatibilidade de mascaras e capacetes",
             "Busca de Mascaras de Gas",
             "Busca de Fones de Ouvido (Headsets)",
             "Busca de Coletes Balisticos",
@@ -6439,17 +7568,15 @@ function Show-ConsultasMenu {
             "Busca Gastronomica (Comidas e Bebidas)"
         )
         
-        $selection = Show-Menu -Title "Consultar Itens (Busca com Filtro)" -Options $consultasOptions -FlickerFree -EnableF1BackButton
+        $selection = Show-Menu -Title "=== Busca de Itens com Filtro ===" -Options $consultasOptions -FlickerFree -EnableF1BackButton
         
         if ($selection -eq $global:ACTION_BACK) { return }
         switch ($selection) {
             "Busca de Armas"                           { Search-WeaponsWithFilters }
             "Busca de Municao"                         { Search-WithFilters }
-            "Comparar armas"                           { Compare-Weapons }
             "Busca de Granadas"                        { Search-ThrowablesWithFilters }
             "Busca de Capacetes"                       { Search-HelmetsWithFilters }
             "Busca de Mascaras"                        { Search-MasksWithFilters }
-            "Consultar compatibilidade de mascaras e capacetes" { List-MaskCompatibility }
             "Busca de Mascaras de Gas"                 { Search-GasMasksWithFilters }
             "Busca de Fones de Ouvido (Headsets)"      { Search-HeadsetsWithFilters }
             "Busca de Coletes Balisticos"              { Search-BodyArmorsWithFilters }
@@ -6678,18 +7805,20 @@ function Show-MainMenu {
     (Get-Host).UI.RawUI.CursorSize = 0
     do {
         $mainMenuOptions = @(
-            "Consultar Itens (Busca com Filtro)",
+            "Busca de Itens com Filtro",
+            "Comparacao e Compatibilidade",
             "Gerenciar Banco de Dados",
             "Tira Duvidas",
             "Verificar Atualizacoes",
             "Sair"
         )
         
-        $selectedOption = Show-Menu -Title "Arena Breakout Infinite Offline Database 0.9.7 (Creator: Fabiopsyduck)" -Options $mainMenuOptions -FlickerFree
+        $selectedOption = Show-Menu -Title "Arena Breakout Infinite Offline Database 0.9.8 (Creator: Fabiopsyduck)" -Options $mainMenuOptions -FlickerFree
         
         switch ($selectedOption) {
-            "Consultar Itens (Busca com Filtro)" { Show-ConsultasMenu }
-            "Gerenciar Banco de Dados"           { Show-GerenciamentoMenu }
+            "Busca de Itens com Filtro"    { Show-ConsultasMenu }
+            "Comparacao e Compatibilidade" { Show-AnalysisMenu }
+            "Gerenciar Banco de Dados"     { Show-GerenciamentoMenu }
             "Tira Duvidas" {
                 $helpOption = Show-Menu -Title "Tira Duvidas" -Options @("Como funciona os criterios (Busca com Filtro)") -FlickerFree -EnableF1BackButton
                 if ($helpOption -eq $global:ACTION_BACK) { continue }
