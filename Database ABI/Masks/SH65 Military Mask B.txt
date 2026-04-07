@@ -1,5 +1,0 @@
-﻿0.80
-65.0
-6
-Composite
-Medium
