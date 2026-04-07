@@ -51,8 +51,10 @@ Coloque o executável (ou script) e a pasta do banco de dados no mesmo diretóri
 ```text
 SuaPastaDedicada/
  ├── ABIDB.exe           (O Aplicativo)
- └── Database ABI/       (A pasta com todos os dados .csv)
-```
+ └── Database ABI/       (A pasta com os dados .csv)
+      ├── Versao.txt     <-- ⚠️ NUNCA apague este arquivo! O aplicativo precisa dele para buscar atualizações.
+      ├── Weapons.csv
+      └── ...
 
 ### 4. Como Executar
 Basta dar um duplo clique no `ABIDB.exe` e o programa abrirá instantaneamente. 
