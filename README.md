@@ -1,84 +1,91 @@
-# Arena Breakout Infinite - Database Offline (ABIDB)
+Arena Breakout Infinite - Database Offline (ABIDB)
+Versão 1.0.0 (Criado por: Fabiopsyduck)
 
-**Versão 0.9.8 (Criado por: Fabiopsyduck)**
+Uma aplicação de desktop completa e intuitiva para catalogar, comparar e consultar rapidamente qualquer item do Arena Breakout Infinite.
 
-Uma ferramenta de console para catalogar e consultar rapidamente qualquer item do Arena Breakout Infinite.
+O ABIDB funciona como sua enciclopédia pessoal e 100% offline para o ABI. Através de uma interface gráfica rica, você pode adicionar seus próprios itens, editar estatísticas, comparar armamentos e usar o menu "Busca com Filtro" para encontrar o melhor equipamento (capacetes, coletes, armas) para sua necessidade, com base em critérios de ordenação complexos.
 
-Este script funciona como sua enciclopédia pessoal e 100% offline para o ABI. Você pode adicionar seus próprios itens, editar estatísticas e usar o menu "Busca com Filtro" para encontrar o melhor equipamento (capacetes, coletes, armas) para sua necessidade, com base em critérios de ordenação complexos.
+⚠️ IMPORTANTE: O aplicativo (motor) e o Banco de Dados (arquivos CSV) agora possuem atualizações independentes. Você precisará baixar os dados separadamente (veja as instruções de instalação abaixo).
 
-O projeto **já inclui um banco de dados pré-carregado (`Database ABI`)** com dados atualizados (07/12/2025) para você começar a usar imediatamente.
+✨ Recursos Principais
+Interface Gráfica Completa (GUI): Navegação por abas, janelas pop-up de edição, tabelas de dados interativas (DataGrid) e menus suspensos. Muito mais fácil e visual do que nunca!
 
-## ✨ Recursos Principais
+Gerenciamento Completo (CRUD): Adicione, edite e apague itens em mais de 19 categorias através de painéis visuais.
 
-  * **Banco de Dados Incluído:** Comece a usar imediatamente com uma base de dados completa (dados de 07/12/2025).
-  * **Gerenciamento Completo (CRUD):** Adicione, edite e apague itens em mais de 19 categorias.
-  * **Categorias Suportadas:**
-      * Armas
-      * Munições (e gerenciamento de Calibres)
-      * Arremessáveis (Granadas)
-      * Capacetes
-      * Máscaras (Táticas e de Gás)
-      * Fones de Ouvido (Headsets)
-      * Coletes (Balísticos, Blindados e Rigs Táticos)
-      * Mochilas
-      * Itens Médicos (Kits, Analgésicos, Cirúrgicos, etc.)
-      * Consumíveis (Comidas e Bebidas)
-  * **Busca com Filtro Avançado:** A funcionalidade principal. Filtre e ordene itens usando múltiplos critérios de desempate (ex: ordenar capacetes por `Cl Max Masc`, depois `Classe de Blindagem`, `Durabilidade`, `Bloqueio` e `Peso`).
-  * **Comparador de Armas:** Um menu dedicado para comparar 2 ou 3 armas lado a lado, exibindo suas estatísticas principais e as tabelas de munição de seus respectivos calibres.
-  * **Gerenciador de Compatibilidade:** Crie e edite listas de quais máscaras são compatíveis com quais capacetes. O script usa essa informação para a ordenação `Cl Max Masc`.
-  * **Sistema de Ajuda Integrado:** Uma seção "Tira Dúvidas" que explica em detalhes como funciona a lógica de ordenação de cada tela de busca.
-  * **Verificador de Atualização:** O script pode verificar este repositório no GitHub para notificar o usuário sobre novas versões.
-  * **Interface de Console Moderna:** Menus de seleção interativos, navegação por teclas (F1, F2, F3...) e um design "flicker-free" (sem piscar).
+Categorias Suportadas:
 
-## 🚀 Requisitos
+Armas
 
-  * Windows 10 ou 11.
-  * PowerShell 5.1 (que vem com o Windows) ou, **preferencialmente**, PowerShell 7 ou superior.
-  * **Windows Terminal** (Recomendado para a melhor experiência visual e para evitar que a tela pisque).
+Munições (e gerenciamento de Calibres)
 
-## 🛠️ Instalação e Uso
+Arremessáveis (Granadas)
 
-Como o banco de dados já está incluído, a instalação é muito simples.
+Capacetes
 
-### 1\. Baixando o Projeto
+Máscaras (Táticas e de Gás)
 
-1.  Vá para a página de **[Releases](https://github.com/fabiopsyduck/Arena-Breakout-Infinite-Offline-Database/releases)** deste repositório.
+Fones de Ouvido (Headsets)
 
-2.  Na versão mais recente, baixe o arquivo `Source code (zip)`.
+Coletes (Balísticos, Blindados e Rigs Táticos)
 
-3.  Descompacte o arquivo `.zip` em um local de sua preferência (ex: `C:\Jogos\ABIDB`).
+Mochilas
 
-4.  Após descompactar, você terá a estrutura de pastas correta, com o script e a base de dados lado a lado:
+Itens Médicos (Kits, Analgésicos, Cirúrgicos, etc.)
 
-    ```
-    SuaPasta/
-    ├── ABIDB.ps1               (O Script)
-    └── Database ABI/           (A pasta com todos os dados)
-    ```
+Consumíveis (Comidas e Bebidas)
 
-### 2\. Como Executar
+Busca com Filtro Avançado: A funcionalidade principal. Filtre e ordene itens usando múltiplos critérios de desempate (ex: ordenar capacetes por Cl Max Masc, depois Classe de Blindagem, Durabilidade, Bloqueio e Peso).
 
-1.  Abra seu terminal (Windows Terminal ou PowerShell).
-2.  Navegue até a pasta que você acabou de descompactar:
-    ```powershell
-    cd C:\Caminho\Para\SuaPasta
-    ```
-3.  Execute o script:
-    ```powershell
-    .\ABIDB.ps1
-    ```
+Exportação de Relatórios: Salve os resultados das suas buscas e filtros diretamente em arquivos CSV com um único clique.
 
-### Solução de Problemas
+Comparador de Armas Avançado: Um menu visual dedicado para comparar de 2 a 3 armas lado a lado, exibindo suas estatísticas principais e as tabelas de munição de seus respectivos calibres.
 
-Se o script não executar e você receber um erro vermelho sobre "execution policy" ou "scripts desabilitados":
+Módulo de Atualização Inteligente: O aplicativo verifica este repositório e o repositório da Database independentemente, notificando você se há novas versões do programa ou novos itens do jogo disponíveis.
 
-  * Execute este comando no seu PowerShell **uma única vez** para permitir a execução de scripts locais:
-    ```powersshell
-    Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
-    ```
-  * Pressione `S` (ou `Y`) e Enter para confirmar.
-  * Tente executar `.\ABIDB.ps1` novamente.
+🚀 Requisitos
+Windows 10 ou 11.
 
-## 📄 Licença
+PowerShell 5.1 (nativo do Windows) ou superior.
 
-Este projeto é distribuído sob a licença MIT. Veja o arquivo `LICENSE` para mais detalhes.
+Conexão com a internet (Apenas para o módulo de verificação de atualizações).
+
+🛠️ Instalação e Uso
+Como o aplicativo e os dados são separados, você precisará baixar ambos e colocá-los na mesma pasta.
+
+1. Baixando o Aplicativo (ABIDB)
+Vá para a página de Releases deste repositório e baixe o ABIDB.exe (ou o script ABIDB.ps1 se preferir o código-fonte).
+
+2. Baixando o Banco de Dados
+Acesse o repositório oficial da base de dados em:
+🔗 ABIDB-Database
+Baixe a versão mais recente e extraia a pasta chamada Database ABI.
+
+3. Estrutura de Pastas (Muito Importante)
+Coloque o executável (ou script) e a pasta do banco de dados no mesmo diretório de sua preferência. A estrutura final deve ficar exatamente assim:
+
+Plaintext
+SuaPastaDedicada/
+ ├── ABIDB.exe           (O Aplicativo)
+ └── Database ABI/       (A pasta com todos os dados .csv)
+4. Como Executar
+Basta dar um duplo clique no ABIDB.exe e o programa abrirá instantaneamente.
+
+(Se você optou por usar a versão em script .ps1, clique com o botão direito nele e escolha "Executar com PowerShell". Pode ser necessário usar o comando Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned uma vez no seu computador para permitir a execução).
+
+💻 Para Desenvolvedores: Como converter o script para .exe
+Se você baixou o código-fonte (abdb.ps1) e deseja compilar o seu próprio executável para ter uma experiência sem a tela preta do console em background, siga os passos abaixo usando o módulo ps2exe:
+
+Abra o PowerShell como Administrador e instale o módulo:
+
+PowerShell
+Install-Module -Name ps2exe -Force
+Navegue até a pasta onde está o seu abdb.ps1.
+
+Execute o seguinte comando para compilar com suporte gráfico moderno (STA) e configurações de High-DPI para o Windows 10/11:
+
+PowerShell
+Invoke-ps2exe -inputFile "abdb.ps1" -outputFile "ABIDB.exe" -noConsole -apartment STA -title "Arena Breakout Infinite - Database Offline" -description "Banco de dados offline para ABI (Licença MIT)" -version "1.0.0" -company "Fabiopsyduck" -product "ABIDB" -copyright "Copyright (c) 2026 Fabiopsyduck - MIT License" -supportOS
+(Opcional: Se você possuir um arquivo de ícone, pode adicionar o parâmetro -iconFile "seu_icone.ico" ao comando).
+
+📄 Licença
+Este projeto é distribuído sob a licença MIT. Veja o arquivo LICENSE para mais detalhes.
