@@ -28,6 +28,30 @@ O ABIDB funciona como sua enciclopédia pessoal e 100% offline para o ABI. Atrav
   * **Comparador de Armas Avançado:** Um menu visual dedicado para comparar de 2 a 3 armas lado a lado, exibindo suas estatísticas principais e as tabelas de munição de seus respectivos calibres.
   * **Módulo de Atualização Inteligente:** O aplicativo verifica este repositório e o repositório da Database independentemente, notificando você se há novas versões do programa ou novos itens do jogo disponíveis.
 
+## 📸 Capturas de Tela
+
+Aqui está uma visão geral da nova interface gráfica do ABIDB v1.0.0.
+
+### 1. Menu Principal
+A central de navegação rápida.
+![Menu Principal](screenshots/menu_principal.png)
+
+### 2. Busca Avançada com Filtros
+Filtre e ordene qualquer item por múltiplos critérios críticos.
+![Busca Avançada](screenshots/busca_filtros.png)
+
+### 3. Comparador de Armas Lado a Lado
+Compare estatísticas de até 3 armas instantaneamente.
+![Comparador de Armas](screenshots/comparador.png)
+
+### 4. Gerenciamento de Database (CRUD)
+Adicione ou edite itens através de formulários visuais intuitivos.
+![Gerenciador de Itens](screenshots/gerenciador_crud.png)
+
+### 5. Verificador de Atualizações Integrado
+Mantenha seu programa e sua database sempre em dia com o GitHub.
+![Tela de Atualização](screenshots/tela_update.png)
+
 ## 🚀 Requisitos
 
   * Windows 10 ou 11.
