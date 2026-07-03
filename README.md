@@ -44,11 +44,15 @@ Filtre e ordene qualquer item por múltiplos critérios críticos.
 Compare estatísticas de até 3 armas instantaneamente.
 ![Comparador de Armas](screenshots/comparador.png)
 
-### 4. Gerenciamento de Database (CRUD)
+### 4. Comparador de Eficiência Balística
+Visualize gráficos precisos da curva de queda de dano e alcance efetivo das munições.
+![Eficiência Balística](screenshots/tela_balistica.png)
+
+### 5. Gerenciamento de Database (CRUD)
 Adicione ou edite itens através de formulários visuais intuitivos.
 ![Gerenciador de Itens](screenshots/gerenciador_crud.png)
 
-### 5. Verificador de Atualizações Integrado
+### 6. Verificador de Atualizações Integrado
 Mantenha seu programa e sua database sempre em dia com o GitHub.
 ![Tela de Atualização](screenshots/tela_update.png)
 
